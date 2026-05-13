@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+.idea/
+# Build output and caches
+dist/
+.astro/
+.wrangler/
+coverage/
+.cache/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+!.env.sample
+.dev.vars
+.dev.vars.*
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# Editor and OS files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Project-local generated/unused files
+bak/
+files.zip
+
+.claude/worktrees
