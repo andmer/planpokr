@@ -6,10 +6,14 @@
 declare global {
 	namespace App {
 		// interface Error {}
-		// interface Locals {}
+		// interface Locals {}  // augmented by svelte-clerk
 		// interface PageData {}
 		// interface PageState {}
-		// interface Platform {}
+		interface Platform {
+			env: Cloudflare.Env;
+			cf?: IncomingRequestCfProperties;
+			ctx: ExecutionContext;
+		}
 	}
 }
 

@@ -49,10 +49,11 @@ export const verifyRoomToken = async (
 ): Promise<RoomClaims> => {
   const [head, body, sig] = token.split('.');
   if (!head || !body || !sig) throw new Error('malformed');
+  const sigBytes = ub64(sig);
   const ok = await crypto.subtle.verify(
     'HMAC',
     await hmacKey(secret),
-    ub64(sig),
+    sigBytes.buffer.slice(sigBytes.byteOffset, sigBytes.byteOffset + sigBytes.byteLength) as ArrayBuffer,
     enc.encode(`${head}.${body}`)
   );
   if (!ok) throw new Error('bad signature');
