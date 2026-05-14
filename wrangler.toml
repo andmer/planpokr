@@ -33,6 +33,11 @@ new_sqlite_classes = ["RoomDO"]
 # Clerk publishable key is safe to commit (it's used in the client bundle).
 PUBLIC_CLERK_PUBLISHABLE_KEY = "pk_live_Y2xlcmsucGxhbnBva3IuY29tJA"
 CLERK_PUBLISHABLE_KEY = "pk_live_Y2xlcmsucGxhbnBva3IuY29tJA"
+# Send the user home after sign-in / sign-up flows complete.
+PUBLIC_CLERK_SIGN_IN_FORCE_REDIRECT_URL = "/"
+PUBLIC_CLERK_SIGN_UP_FORCE_REDIRECT_URL = "/"
+PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL = "/"
+PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL = "/"
 
 # Secrets (set via `wrangler secret put`, never committed):
 #   CLERK_SECRET_KEY
