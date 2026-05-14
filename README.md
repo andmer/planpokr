@@ -1,42 +1,78 @@
-# sv
+# planpokr
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+Team planning-poker webapp. Deployed at [planpokr.com](https://planpokr.com).
 
-## Creating a project
+## Stack
 
-If you're seeing this, you've probably already done this step. Congrats!
+- SvelteKit on Cloudflare Workers (`@sveltejs/adapter-cloudflare`)
+- Room Durable Object (hibernatable WebSockets) for per-room live state
+- D1 for users, rooms, stories, vote rounds, votes
+- Clerk for auth (room-scoped HMAC JWT minted by the Worker)
+- Tailwind v4 with `@theme` driving CSS custom properties
 
-```sh
-# create a new project
-npx sv create my-app
+## Design system
+
+Every design token lives in `src/lib/theme/tokens.css`. Re-skin the whole app by editing that one file. No component hardcodes a color, radius, or shadow.
+
+## Local development
+
+```bash
+pnpm i
+cp .dev.vars.example .dev.vars   # then fill in Clerk + ROOM_TOKEN_SECRET
+pnpm db:migrate:local
+pnpm dev
 ```
 
-To recreate this project with the same configuration:
+Open <http://localhost:5173>. Sign in via Clerk, create a room, share the room URL with a teammate (or open a second browser tab as a different Clerk user).
 
-```sh
-# recreate this project
-pnpm dlx sv@0.15.3 create --template minimal --types ts --install pnpm .
+## Tests
+
+```bash
+pnpm test        # vitest unit tests
+pnpm test:e2e    # playwright (requires `pnpm build` first)
+pnpm check       # svelte-check
 ```
 
-## Developing
+## Deploy
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+```bash
+# One-time: create the D1 database and paste the printed UUID into wrangler.toml
+pnpm dlx wrangler d1 create planpokr
 
-```sh
-npm run dev
+# One-time: set production secrets
+pnpm dlx wrangler secret put CLERK_SECRET_KEY
+pnpm dlx wrangler secret put CLERK_PUBLISHABLE_KEY
+pnpm dlx wrangler secret put ROOM_TOKEN_SECRET   # value: openssl rand -hex 32
 
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
+# Each release
+pnpm db:migrate:prod
+pnpm build
+pnpm deploy
 ```
 
-## Building
+Custom domain: Cloudflare dashboard → Workers → planpokr → Triggers → Custom Domains → add `planpokr.com`.
 
-To create a production version of your app:
+## Architecture (one paragraph)
 
-```sh
-npm run build
-```
+A single Cloudflare Worker hosts both the SvelteKit app and the `RoomDO` Durable Object class. The Worker handles HTML, REST endpoints, Clerk session verification, and minting short-lived HMAC tokens that scope a WebSocket connection to a specific `(user, room, role)`. The DO holds in-memory state per room (current round, pre-reveal votes, presence) and broadcasts via the hibernatable WebSocket API. Pre-reveal votes live in memory only; on `reveal` the DO flushes votes to D1, which stores the durable history (every round, every vote, every accepted estimate). On `accept` the DO updates the story's `final_estimate` and the round's `accepted_estimate`. Re-voting starts a new `vote_rounds` row so the audit trail is complete.
 
-You can preview the production build with `npm run preview`.
+## File layout
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+- `src/lib/theme/tokens.css` — single source of truth for all design tokens
+- `src/lib/components/` — reusable Svelte 5 components (Pcard, Chip, Verdict, Topbar, etc.)
+- `src/lib/server/` — server-only modules (db helpers, auth, slug)
+- `src/lib/do/` — Durable Object (`RoomDO.ts`), message types, state shapes
+- `src/lib/ws/client.ts` — browser WebSocket store
+- `src/lib/stats.ts` — pure stats computation, shared by DO + history page
+- `src/lib/decks.ts` — deck definitions (Fibonacci, T-shirt)
+- `src/routes/` — SvelteKit pages + API endpoints
+- `migrations/` — D1 schema
+- `tests/unit/` — Vitest
+- `tests/e2e/` — Playwright
+- `docs/superpowers/specs/` — design spec
+- `docs/superpowers/plans/` — implementation plan
+
+## Design spec & implementation plan
+
+- [`docs/superpowers/specs/2026-05-13-scrumpoker-design.md`](docs/superpowers/specs/2026-05-13-scrumpoker-design.md)
+- [`docs/superpowers/plans/2026-05-13-planpokr-implementation.md`](docs/superpowers/plans/2026-05-13-planpokr-implementation.md)

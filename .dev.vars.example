@@ -1,0 +1,4 @@
+CLERK_SECRET_KEY=sk_test_paste_yours_here
+CLERK_PUBLISHABLE_KEY=pk_test_paste_yours_here
+PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_paste_yours_here
+ROOM_TOKEN_SECRET=generate_with_openssl_rand_hex_32
