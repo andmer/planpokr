@@ -38,5 +38,9 @@
 		"vite": "^8.0.7",
 		"vitest": "^4.1.6",
 		"wrangler": "^4.90.1"
+	},
+	"dependencies": {
+		"@clerk/backend": "^3.4.7",
+		"svelte-clerk": "^1.1.7"
 	}
 }
