@@ -1,6 +1,7 @@
 <script lang="ts">
   import '../app.css';
-  let { children } = $props();
+  import { ClerkProvider } from 'svelte-clerk';
+  let { children, data } = $props();
 </script>
 
 <svelte:head>
@@ -9,4 +10,6 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/JetBrains/JetBrainsMono/web/woff2/JetBrainsMono.css" />
 </svelte:head>
 
-{@render children()}
+<ClerkProvider initialState={data.initialState}>
+  {@render children()}
+</ClerkProvider>

@@ -1,5 +1,5 @@
 import type { LayoutServerLoad } from './$types';
-import { clerkClient } from 'svelte-clerk/server';
+import { buildClerkProps, clerkClient } from 'svelte-clerk/server';
 import { upsertUser } from '$lib/server/db';
 
 // Mirror the Clerk user into D1 on every authenticated hit so other server
@@ -15,7 +15,7 @@ export const load: LayoutServerLoad = async (event) => {
   const auth = event.locals.auth();
   if (!auth?.userId) {
     // Unauthenticated → landing page will render the Clerk sign-in widget.
-    return { user: null };
+    return { user: null, ...buildClerkProps(auth) };
   }
 
   const clerkUser = await clerkClient.users.getUser(auth.userId);
@@ -36,6 +36,7 @@ export const load: LayoutServerLoad = async (event) => {
       id: clerkUser.id,
       name: displayName,
       avatar: clerkUser.imageUrl ?? null
-    }
+    },
+    ...buildClerkProps(auth)
   };
 };
