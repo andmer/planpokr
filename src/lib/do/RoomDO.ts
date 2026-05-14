@@ -228,8 +228,12 @@ export class RoomDO extends DurableObject<Env> {
           this.env.DB.prepare(
             'INSERT INTO vote_rounds (id, story_id, round_number, started_at) VALUES (?, ?, ?, ?)'
           ).bind(roundId, msg.storyId, roundNumber, startedAt),
+          // Re-opening a previously-estimated story is a valid `start_round`.
+          // Clear final_estimate/final_round_id so the sidebar + rooms
+          // rollup don't keep showing a stale number while the team
+          // re-estimates.
           this.env.DB.prepare(
-            "UPDATE stories SET status = 'voting' WHERE id = ?"
+            "UPDATE stories SET status = 'voting', final_estimate = NULL, final_round_id = NULL WHERE id = ?"
           ).bind(msg.storyId)
         ]);
         this.current = {

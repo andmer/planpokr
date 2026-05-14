@@ -125,7 +125,11 @@ export const createRoomConnection = (roomId: string): RoomConnection => {
             myVote: null,
             presence: s.presence.map((p) => ({ ...p, voted: false })),
             stories: s.stories.map((st) =>
-              st.id === msg.storyId ? { ...st, status: 'voting' } : st
+              // Match the server's clear of final_estimate/final_round_id on
+              // start_round — re-opening a previously-estimated story.
+              st.id === msg.storyId
+                ? { ...st, status: 'voting', final_estimate: null, final_round_id: null }
+                : st
             )
           };
         case 'revealed':

@@ -140,7 +140,15 @@
       {/if}
       <div class="final-num">{finalized.estimate}</div>
       {#if isHost}
-        <p class="final-hint">Pick the next story in the sidebar to continue.</p>
+        <div class="final-actions">
+          <Button
+            variant="ghost"
+            onclick={() => send({ type: 'start_round', storyId: finalized.storyId })}
+          >
+            Re-open voting
+          </Button>
+        </div>
+        <p class="final-hint">Or pick the next story in the sidebar to continue.</p>
       {:else}
         <p class="final-hint">Waiting for the host to start the next round.</p>
       {/if}
@@ -600,6 +608,11 @@
   }
   .final-pane.skipped .final-num {
     text-shadow: 0 8px 36px rgb(233 184 107 / 0.35);
+  }
+  .final-actions {
+    margin-top: 8px;
+    display: flex;
+    gap: 10px;
   }
   .final-hint {
     color: var(--color-mid);
