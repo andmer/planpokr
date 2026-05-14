@@ -11,19 +11,19 @@
   import type { Deck } from '$lib/types';
 
   interface Props {
-    state: LiveState;
+    live: LiveState;
     send: (m: ClientMsg) => void;
     setMyVote: (v: string | null) => void;
   }
-  let { state, send, setMyVote }: Props = $props();
+  let { live, send, setMyVote }: Props = $props();
 
-  const currentStory = $derived(state.stories.find((s) => s.id === state.current?.storyId));
-  const cards = $derived<string[]>(state.room ? DECKS[state.room.deck as Deck] : []);
-  const isHost = $derived(state.you?.isHost ?? false);
-  const inVoting = $derived(!!state.current && !state.current.revealed);
-  const inReveal = $derived(state.current?.revealed ?? false);
+  const currentStory = $derived(live.stories.find((s) => s.id === live.current?.storyId));
+  const cards = $derived<string[]>(live.room ? DECKS[live.room.deck as Deck] : []);
+  const isHost = $derived(live.you?.isHost ?? false);
+  const inVoting = $derived(!!live.current && !live.current.revealed);
+  const inReveal = $derived(live.current?.revealed ?? false);
   const consensusReached = $derived(
-    inReveal && state.current?.stats?.verdict === 'consensus'
+    inReveal && live.current?.stats?.verdict === 'consensus'
   );
 
   // Auto-accept on consensus: when the host reaches consensus on a reveal,
@@ -49,7 +49,7 @@
       countdown = (countdown ?? 0) - 1;
       if ((countdown ?? 0) <= 0) {
         cancelCountdown();
-        send({ type: 'accept', value: state.current?.stats?.median ?? '?' });
+        send({ type: 'accept', value: live.current?.stats?.median ?? '?' });
       }
     }, 1000);
   }
@@ -57,21 +57,21 @@
     if (consensusReached && isHost) {
       // Use roundId as an effect dependency so a re-vote landing on
       // consensus again restarts the countdown for the new round.
-      void state.current?.roundId;
+      void live.current?.roundId;
       startCountdown();
     } else {
       cancelCountdown();
     }
     return cancelCountdown;
   });
-  // After Accept / Skip, `state.current` clears but `lastFinalized` carries
+  // After Accept / Skip, `live.current` clears but `lastFinalized` carries
   // the just-locked-in result so we can show it in the middle until the
   // host moves on to another story.
   const finalized = $derived(
-    !state.current && state.lastFinalized
+    !live.current && live.lastFinalized
       ? {
-          ...state.lastFinalized,
-          story: state.stories.find((st) => st.id === state.lastFinalized!.storyId)
+          ...live.lastFinalized,
+          story: live.stories.find((st) => st.id === live.lastFinalized!.storyId)
         }
       : null
   );
@@ -80,15 +80,15 @@
   // `role` colours the chip per voter (you/host/default); `state` ties the
   // chip border to the round's verdict so divergent rounds read as red.
   const priorRoundsForStrip = $derived(
-    (state.current?.priorRounds ?? []).map((pr) => ({
+    (live.current?.priorRounds ?? []).map((pr) => ({
       num: pr.roundNumber,
       votes: pr.votes.map((v) => ({
         initial: v.initial,
         value: v.value,
         role:
-          v.userId === state.you?.userId
+          v.userId === live.you?.userId
             ? ('you' as const)
-            : v.userId === state.room?.hostUserId
+            : v.userId === live.room?.hostUserId
               ? ('host' as const)
               : ('default' as const),
         state:
@@ -105,7 +105,7 @@
 
   function pickCard(v: string) {
     if (!inVoting) return;
-    if (state.myVote === v) {
+    if (live.myVote === v) {
       send({ type: 'clear_vote' });
       setMyVote(null);
     } else {
@@ -120,7 +120,7 @@
   class:revealed={inReveal}
   class:finalized={!!finalized}
 >
-  {#if !state.current && finalized}
+  {#if !live.current && finalized}
     <!-- Show the just-locked-in story as the primary content of the hero
          pane. Cleared on the next round_started, so picking another story
          in the sidebar transitions naturally back into voting. -->
@@ -145,7 +145,7 @@
         <p class="final-hint">Waiting for the host to start the next round.</p>
       {/if}
     </div>
-  {:else if !state.current}
+  {:else if !live.current}
     <div class="empty">
       <PaneHead>Ready</PaneHead>
       <p class="empty-msg">
@@ -159,7 +159,7 @@
     </div>
   {:else}
     <span class="roundtag" class:reveal={inReveal}>
-      <span class="dot"></span>ROUND {state.current.roundNumber} · {inReveal ? 'REVEALED' : 'VOTING'}
+      <span class="dot"></span>ROUND {live.current.roundNumber} · {inReveal ? 'REVEALED' : 'VOTING'}
     </span>
     {#if currentStory}
       <h2 class="story-title">{currentStory.title}</h2>
@@ -172,7 +172,7 @@
       <PaneHead>Your vote</PaneHead>
       <div class="cards">
         {#each cards as v (v)}
-          <Pcard value={v} selected={state.myVote === v} onclick={() => pickCard(v)} />
+          <Pcard value={v} selected={live.myVote === v} onclick={() => pickCard(v)} />
         {/each}
       </div>
       {#if isHost}
@@ -185,7 +185,7 @@
           </span>
         </div>
       {/if}
-    {:else if state.current.revealed && consensusReached}
+    {:else if live.current.revealed && consensusReached}
       <!-- Consensus path: simplified celebratory display. Per-voter chips and
            median/range row hidden — everyone voted the same, so there's
            nothing extra to read. Big number + primary Accept + secondary
@@ -194,19 +194,19 @@
         <div class="consensus-tag">
           <span class="check">✓</span> CONSENSUS REACHED
         </div>
-        <div class="consensus-num">{state.current.stats?.median ?? '?'}</div>
+        <div class="consensus-num">{live.current.stats?.median ?? '?'}</div>
         <div class="consensus-meta">
-          {Object.keys(state.current.votes ?? {}).length} of {state.presence.length} agreed
+          {Object.keys(live.current.votes ?? {}).length} of {live.presence.length} agreed
         </div>
         {#if isHost}
           <div class="consensus-ctrl">
             <Button
               onclick={() => {
                 cancelCountdown();
-                send({ type: 'accept', value: state.current?.stats?.median ?? '?' });
+                send({ type: 'accept', value: live.current?.stats?.median ?? '?' });
               }}
             >
-              Accept estimate · {state.current.stats?.median ?? '?'}
+              Accept estimate · {live.current.stats?.median ?? '?'}
             </Button>
             {#if countdown !== null}
               <div class="countdown" aria-live="polite">
@@ -241,17 +241,17 @@
           </div>
         {/if}
       </div>
-    {:else if state.current.revealed}
-      <PaneHead>Round {state.current.roundNumber} · Reveal</PaneHead>
+    {:else if live.current.revealed}
+      <PaneHead>Round {live.current.roundNumber} · Reveal</PaneHead>
       <div class="reveal-cards">
-        {#each Object.entries(state.current.votes ?? {}) as [uid, value] (uid)}
-          {@const member = state.presence.find((p) => p.userId === uid)}
+        {#each Object.entries(live.current.votes ?? {}) as [uid, value] (uid)}
+          {@const member = live.presence.find((p) => p.userId === uid)}
           <div class="reveal-card">
             <Pcard value={String(value)} size="lg" />
             <div class="voter">{member?.initial ?? '?'} {member?.name ?? ''}</div>
           </div>
         {/each}
-        {#if Object.keys(state.current.votes ?? {}).length === 0}
+        {#if Object.keys(live.current.votes ?? {}).length === 0}
           <p class="empty-msg">No votes were cast this round.</p>
         {/if}
       </div>
@@ -259,24 +259,24 @@
       <div class="outcome">
         <div>
           <div class="lbl">Median estimate</div>
-          <div class="num">{state.current.stats?.median ?? '?'}</div>
+          <div class="num">{live.current.stats?.median ?? '?'}</div>
         </div>
         <div class="stats">
-          range <span class="v">{state.current.stats?.range ?? '?'}</span>
-          · {Object.keys(state.current.votes ?? {}).length} of {state.presence.length} voted
+          range <span class="v">{live.current.stats?.range ?? '?'}</span>
+          · {Object.keys(live.current.votes ?? {}).length} of {live.presence.length} voted
         </div>
         <Verdict
-          kind={state.current.stats?.verdict ?? 'no-consensus'}
-          value={state.current.stats?.median}
+          kind={live.current.stats?.verdict ?? 'no-consensus'}
+          value={live.current.stats?.median}
         />
       </div>
 
       {#if isHost}
         <div class="ctrl">
           <Button
-            onclick={() => send({ type: 'accept', value: state.current?.stats?.median ?? '?' })}
+            onclick={() => send({ type: 'accept', value: live.current?.stats?.median ?? '?' })}
           >
-            Accept estimate · {state.current.stats?.median ?? '?'}
+            Accept estimate · {live.current.stats?.median ?? '?'}
           </Button>
           <Button variant="ghost" onclick={() => send({ type: 'revote' })}>Re-vote</Button>
           <Button variant="ghost" onclick={() => send({ type: 'skip' })}>Skip</Button>

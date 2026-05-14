@@ -72,7 +72,7 @@
     isHost={$live.you?.isHost ?? false}
     {send}
   />
-  <HeroPane state={$live} {send} {setMyVote} />
+  <HeroPane live={$live} {send} {setMyVote} />
   <ParticipantsPane
     presence={$live.presence}
     current={$live.current}
