@@ -1,9 +1,11 @@
 <script lang="ts">
   type Kind = 'consensus' | 'no-consensus' | 'skipped';
   let { kind, value } = $props<{ kind: Kind; value?: string }>();
-  const label = kind === 'consensus' ? `CONSENSUS${value ? ` → ${value}` : ''}`
-              : kind === 'no-consensus' ? 'NO CONSENSUS'
-              : 'SKIPPED';
+  const label = $derived(
+    kind === 'consensus' ? `CONSENSUS${value ? ` → ${value}` : ''}`
+      : kind === 'no-consensus' ? 'NO CONSENSUS'
+      : 'SKIPPED'
+  );
 </script>
 
 <span class="v kind-{kind}">{label}</span>
