@@ -33,9 +33,19 @@ type CurrentMem = {
   pre: Map<string, string>;
 } | null;
 
+/** Subset of CurrentMem persisted to storage. The pre-reveal vote map is
+ *  intentionally left out — pre-reveal votes are transient by design (the
+ *  spec accepts losing them on hibernation; the host just re-runs the round).
+ *  Post-reveal votes already live in the `votes` table. */
+type CurrentPersisted = Omit<NonNullable<CurrentMem>, 'pre'>;
+
 export class RoomDO extends DurableObject<Env> {
-  /** In-memory active round state. Wiped on hibernation; that is acceptable. */
+  /** In-memory active round state. Hydrated from storage on first access so
+   *  it survives hibernation: a host that revealed a round, then everyone
+   *  closed the tab and came back, lands on the same reveal pane instead of
+   *  a fresh empty room. */
   private current: CurrentMem = null;
+  private currentRestored = false;
 
   // ---- session helpers ----
 
@@ -107,9 +117,36 @@ export class RoomDO extends DurableObject<Env> {
     else await this.ctx.storage.delete('lastFinalized');
   }
 
+  /** Hydrate `this.current` from persisted storage on first call after
+   *  hibernation. Pre-reveal votes are intentionally lost (spec); reveal
+   *  state is restored fully — the post-reveal `votes` map is rebuilt from
+   *  the `votes` table on demand inside sendState. */
+  private async ensureCurrent(): Promise<void> {
+    if (this.currentRestored) return;
+    this.currentRestored = true;
+    const persisted = await this.ctx.storage.get<CurrentPersisted>('current');
+    if (persisted) {
+      this.current = { ...persisted, pre: new Map() };
+    }
+  }
+  private async persistCurrent(): Promise<void> {
+    if (!this.current) {
+      await this.ctx.storage.delete('current');
+      return;
+    }
+    const { storyId, roundId, roundNumber, revealed } = this.current;
+    await this.ctx.storage.put<CurrentPersisted>('current', {
+      storyId,
+      roundId,
+      roundNumber,
+      revealed
+    });
+  }
+
   // ---- DO fetch handler ----
 
   async fetch(req: Request): Promise<Response> {
+    await this.ensureCurrent();
     const url = new URL(req.url);
 
     if (url.pathname === '/ws') {
@@ -154,6 +191,7 @@ export class RoomDO extends DurableObject<Env> {
   // ---- WebSocket message dispatch ----
 
   async webSocketMessage(ws: WebSocket, data: ArrayBuffer | string) {
+    await this.ensureCurrent();
     const s = this.session(ws);
     if (!s) {
       ws.close(4401, 'no session');
@@ -203,6 +241,7 @@ export class RoomDO extends DurableObject<Env> {
         };
         // Starting a new round means we've moved past the prior result.
         await this.setLastFinalized(null);
+        await this.persistCurrent();
         const priorRounds = await this.priorRoundsForStory(msg.storyId);
         this.broadcast({
           type: 'round_started',
@@ -246,6 +285,7 @@ export class RoomDO extends DurableObject<Env> {
         const votes = Object.fromEntries(this.current.pre);
         this.current.revealed = true;
         await this.flushVotes(this.current.roundId, votes);
+        await this.persistCurrent();
         this.broadcast({
           type: 'revealed',
           roundId: this.current.roundId,
@@ -280,6 +320,7 @@ export class RoomDO extends DurableObject<Env> {
           estimate: msg.value
         });
         this.current = null;
+        await this.persistCurrent();
         return;
       }
 
@@ -309,6 +350,7 @@ export class RoomDO extends DurableObject<Env> {
           pre: new Map()
         };
         await this.setLastFinalized(null);
+        await this.persistCurrent();
         const priorRounds = await this.priorRoundsForStory(storyId);
         this.broadcast({
           type: 'round_started',
@@ -332,6 +374,7 @@ export class RoomDO extends DurableObject<Env> {
         await this.setLastFinalized({ storyId, estimate: '—', kind: 'skipped' });
         this.broadcast({ type: 'skipped', storyId });
         this.current = null;
+        await this.persistCurrent();
         return;
       }
 
@@ -455,12 +498,31 @@ export class RoomDO extends DurableObject<Env> {
         .all<Story>()
     ).results;
 
+    // For a revealed round (especially after a wake-from-hibernation
+    // restore where this.current.pre is empty), rehydrate the votes from
+    // the `votes` table so the reveal pane on the client renders the same
+    // chips and stats it had before the page reload.
+    let restoredVotes: Record<string, string> | undefined;
+    let restoredStats: ReturnType<typeof computeStats> | undefined;
+    if (this.current?.revealed) {
+      const rows = (
+        await db
+          .prepare('SELECT user_id, value FROM votes WHERE round_id = ?')
+          .bind(this.current.roundId)
+          .all<{ user_id: string; value: string }>()
+      ).results;
+      restoredVotes = Object.fromEntries(rows.map((r) => [r.user_id, r.value]));
+      restoredStats = computeStats(restoredVotes);
+    }
+
     const current = this.current
       ? {
           storyId: this.current.storyId,
           roundId: this.current.roundId,
           roundNumber: this.current.roundNumber,
           revealed: this.current.revealed,
+          votes: restoredVotes,
+          stats: restoredStats,
           voted: Array.from(this.current.pre.keys()),
           priorRounds: await this.priorRoundsForStory(this.current.storyId)
         }
