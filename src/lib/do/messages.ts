@@ -2,6 +2,9 @@
 // protocol. Used by both the DO (server) and the browser client.
 
 import type { Story, Deck } from '$lib/types';
+import type { RevealStats } from '$lib/stats';
+
+export type { RevealStats };
 
 // === Client → Server (over WS) ===
 export type ClientMsg =
@@ -40,12 +43,6 @@ export type CurrentRound =
       stats?: RevealStats;
     }
   | null;
-
-export type RevealStats = {
-  median: string;
-  range: string;
-  verdict: 'consensus' | 'no-consensus';
-};
 
 export type ServerMsg =
   | {

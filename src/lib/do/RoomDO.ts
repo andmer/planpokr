@@ -10,12 +10,8 @@
 
 import { DurableObject } from 'cloudflare:workers';
 import { verifyRoomToken, type RoomClaims } from '$lib/server/auth';
-import type {
-  ClientMsg,
-  ServerMsg,
-  Presence,
-  RevealStats
-} from './messages';
+import type { ClientMsg, ServerMsg, Presence } from './messages';
+import { computeStats } from '$lib/stats';
 import type { Story } from '$lib/types';
 
 type Env = { DB: D1Database; ROOM_TOKEN_SECRET: string };
@@ -234,7 +230,7 @@ export class RoomDO extends DurableObject<Env> {
           type: 'revealed',
           roundId: this.current.roundId,
           votes,
-          stats: this.computeStats(votes)
+          stats: computeStats(votes)
         });
         return;
       }
@@ -480,22 +476,5 @@ export class RoomDO extends DurableObject<Env> {
       )
     ];
     await this.env.DB.batch(stmts);
-  }
-
-  private computeStats(votes: Record<string, string>): RevealStats {
-    const all = Object.values(votes);
-    const numeric = all.filter((v) => /^\d+$/.test(v)).map(Number);
-    numeric.sort((a, b) => a - b);
-    if (!numeric.length) {
-      return { median: '?', range: '?', verdict: 'no-consensus' };
-    }
-    const median = numeric[Math.floor(numeric.length / 2)];
-    const lo = numeric[0];
-    const hi = numeric[numeric.length - 1];
-    return {
-      median: String(median),
-      range: lo === hi ? String(lo) : `${lo}–${hi}`,
-      verdict: new Set(all).size === 1 ? 'consensus' : 'no-consensus'
-    };
   }
 }
