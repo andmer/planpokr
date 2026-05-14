@@ -89,6 +89,12 @@ export class RoomDO extends DurableObject<Env> {
     }
   }
 
+  private async roomId(): Promise<string> {
+    const v = await this.ctx.storage.get<string>('roomId');
+    if (!v) throw new Error('roomId not initialized');
+    return v;
+  }
+
   // ---- DO fetch handler ----
 
   async fetch(req: Request): Promise<Response> {
@@ -304,12 +310,78 @@ export class RoomDO extends DurableObject<Env> {
         return;
       }
 
-      default:
+      case 'kick': {
+        if (s.role !== 'host') return this.errTo(ws, 'not_host', 'host only');
+        this.broadcast({ type: 'kicked', userId: msg.userId });
+        for (const target of this.ctx.getWebSockets()) {
+          const ts = this.session(target);
+          if (ts?.userId === msg.userId) {
+            try {
+              target.close(4001, 'kicked');
+            } catch {
+              /* ignore */
+            }
+          }
+        }
+        if (this.current) this.current.pre.delete(msg.userId);
+        return;
+      }
+
+      case 'transfer_host': {
+        if (s.role !== 'host') return this.errTo(ws, 'not_host', 'host only');
+        const roomId = await this.roomId();
+        await this.env.DB.prepare(
+          'UPDATE rooms SET host_user_id = ? WHERE id = ?'
+        )
+          .bind(msg.userId, roomId)
+          .run();
+        for (const w of this.ctx.getWebSockets()) {
+          const att = this.session(w);
+          if (att) {
+            const role: 'host' | 'member' =
+              att.userId === msg.userId ? 'host' : 'member';
+            w.serializeAttachment({ ...att, role });
+          }
+        }
+        this.broadcast({ type: 'host_changed', hostUserId: msg.userId });
+        return;
+      }
+
+      case 'claim_host': {
+        // v1 heuristic: allow only if no host socket is currently attached.
+        // A production version would track last-seen timestamp for the host.
+        const hostPresent = this.ctx
+          .getWebSockets()
+          .some((w) => this.session(w)?.role === 'host');
+        if (hostPresent) {
+          return this.errTo(ws, 'host_present', 'cannot claim');
+        }
+        const roomId = await this.roomId();
+        await this.env.DB.prepare(
+          'UPDATE rooms SET host_user_id = ? WHERE id = ?'
+        )
+          .bind(s.userId, roomId)
+          .run();
+        for (const w of this.ctx.getWebSockets()) {
+          const att = this.session(w);
+          if (att) {
+            const role: 'host' | 'member' =
+              att.userId === s.userId ? 'host' : 'member';
+            w.serializeAttachment({ ...att, role });
+          }
+        }
+        this.broadcast({ type: 'host_changed', hostUserId: s.userId });
+        return;
+      }
+
+      default: {
+        const _exhaustive: never = msg;
         return this.errTo(
           ws,
           'unimpl',
-          `unhandled: ${(msg as ClientMsg).type}`
+          `unhandled: ${(_exhaustive as ClientMsg).type}`
         );
+      }
     }
   }
 
