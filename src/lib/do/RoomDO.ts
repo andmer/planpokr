@@ -10,7 +10,12 @@
 
 import { DurableObject } from 'cloudflare:workers';
 import { verifyRoomToken, type RoomClaims } from '$lib/server/auth';
-import type { ClientMsg, ServerMsg, Presence } from './messages';
+import type {
+  ClientMsg,
+  ServerMsg,
+  Presence,
+  RevealStats
+} from './messages';
 import type { Story } from '$lib/types';
 
 type Env = { DB: D1Database; ROOM_TOKEN_SECRET: string };
@@ -153,6 +158,81 @@ export class RoomDO extends DurableObject<Env> {
         // Initial state was already sent on connect; treat as no-op.
         return;
 
+      case 'start_round': {
+        if (s.role !== 'host') return this.errTo(ws, 'not_host', 'host only');
+        const next = await this.env.DB.prepare(
+          'SELECT COALESCE(MAX(round_number), 0) + 1 AS n FROM vote_rounds WHERE story_id = ?'
+        )
+          .bind(msg.storyId)
+          .first<{ n: number }>();
+        const roundNumber = next?.n ?? 1;
+        const roundId = crypto.randomUUID();
+        const startedAt = Date.now();
+        await this.env.DB.batch([
+          this.env.DB.prepare(
+            'INSERT INTO vote_rounds (id, story_id, round_number, started_at) VALUES (?, ?, ?, ?)'
+          ).bind(roundId, msg.storyId, roundNumber, startedAt),
+          this.env.DB.prepare(
+            "UPDATE stories SET status = 'voting' WHERE id = ?"
+          ).bind(msg.storyId)
+        ]);
+        this.current = {
+          storyId: msg.storyId,
+          roundId,
+          roundNumber,
+          revealed: false,
+          pre: new Map()
+        };
+        this.broadcast({
+          type: 'round_started',
+          storyId: msg.storyId,
+          roundId,
+          roundNumber
+        });
+        return;
+      }
+
+      case 'vote': {
+        if (!this.current || this.current.revealed) {
+          return this.errTo(ws, 'stale', 'no active round');
+        }
+        this.current.pre.set(s.userId, msg.value);
+        this.broadcast({
+          type: 'presence',
+          userId: s.userId,
+          status: 'voted'
+        });
+        return;
+      }
+
+      case 'clear_vote': {
+        if (!this.current || this.current.revealed) return;
+        this.current.pre.delete(s.userId);
+        this.broadcast({
+          type: 'presence',
+          userId: s.userId,
+          status: 'cleared'
+        });
+        return;
+      }
+
+      case 'reveal': {
+        if (s.role !== 'host') return this.errTo(ws, 'not_host', 'host only');
+        if (!this.current || this.current.revealed) {
+          return this.errTo(ws, 'stale', 'nothing to reveal');
+        }
+        const votes = Object.fromEntries(this.current.pre);
+        this.current.revealed = true;
+        await this.flushVotes(this.current.roundId, votes);
+        this.broadcast({
+          type: 'revealed',
+          roundId: this.current.roundId,
+          votes,
+          stats: this.computeStats(votes)
+        });
+        return;
+      }
+
       default:
         return this.errTo(
           ws,
@@ -238,5 +318,41 @@ export class RoomDO extends DurableObject<Env> {
     } catch {
       /* ignore */
     }
+  }
+
+  private async flushVotes(
+    roundId: string,
+    votes: Record<string, string>
+  ): Promise<void> {
+    const now = Date.now();
+    const entries = Object.entries(votes);
+    const stmts = [
+      this.env.DB.prepare(
+        'UPDATE vote_rounds SET revealed_at = ? WHERE id = ?'
+      ).bind(now, roundId),
+      ...entries.map(([uid, v]) =>
+        this.env.DB.prepare(
+          'INSERT INTO votes (round_id, user_id, value, voted_at) VALUES (?, ?, ?, ?)'
+        ).bind(roundId, uid, v, now)
+      )
+    ];
+    await this.env.DB.batch(stmts);
+  }
+
+  private computeStats(votes: Record<string, string>): RevealStats {
+    const all = Object.values(votes);
+    const numeric = all.filter((v) => /^\d+$/.test(v)).map(Number);
+    numeric.sort((a, b) => a - b);
+    if (!numeric.length) {
+      return { median: '?', range: '?', verdict: 'no-consensus' };
+    }
+    const median = numeric[Math.floor(numeric.length / 2)];
+    const lo = numeric[0];
+    const hi = numeric[numeric.length - 1];
+    return {
+      median: String(median),
+      range: lo === hi ? String(lo) : `${lo}–${hi}`,
+      verdict: new Set(all).size === 1 ? 'consensus' : 'no-consensus'
+    };
   }
 }
