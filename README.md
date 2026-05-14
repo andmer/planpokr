@@ -18,12 +18,42 @@ Every design token lives in `src/lib/theme/tokens.css`. Re-skin the whole app by
 
 ```bash
 pnpm i
-cp .dev.vars.example .dev.vars   # then fill in Clerk + ROOM_TOKEN_SECRET
+cp .dev.vars.example .dev.vars         # Wrangler runtime secrets
+cp .env.local.example .env.local       # SvelteKit/Vite (PUBLIC_* Clerk config)
+# fill in Clerk keys + a fresh ROOM_TOKEN_SECRET in both files
 pnpm db:migrate:local
 pnpm dev
 ```
 
 Open <http://localhost:5173>. Sign in via Clerk, create a room, share the room URL with a teammate (or open a second browser tab as a different Clerk user).
+
+### Environment files
+
+Two env files are needed for local dev — both are gitignored.
+
+**`.dev.vars`** — read by Wrangler at runtime (Worker + Durable Object). Server-only secrets.
+
+```
+CLERK_SECRET_KEY=sk_test_...
+CLERK_PUBLISHABLE_KEY=pk_test_...
+PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+ROOM_TOKEN_SECRET=<openssl rand -hex 32>
+```
+
+**`.env.local`** — read by SvelteKit/Vite at build & dev time. `PUBLIC_*` vars are exposed to the browser bundle, so this is where the Clerk client config lives.
+
+```
+CLERK_SECRET_KEY=sk_test_...
+PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+PUBLIC_CLERK_SIGN_IN_FORCE_REDIRECT_URL=/
+PUBLIC_CLERK_SIGN_UP_FORCE_REDIRECT_URL=/
+PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL=/
+PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL=/
+```
+
+Get the Clerk keys from your Clerk dashboard (Developers → API Keys). `ROOM_TOKEN_SECRET` is local-only — any 32-byte hex string works.
 
 ## Tests
 
