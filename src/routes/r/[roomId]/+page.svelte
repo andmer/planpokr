@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy, onMount, untrack } from 'svelte';
   import { get } from 'svelte/store';
+  import { page } from '$app/state';
   import { createRoomConnection } from '$lib/ws/client';
   import Topbar from '$lib/components/Topbar.svelte';
   import Statusbar from '$lib/components/Statusbar.svelte';
@@ -9,6 +10,9 @@
   import ParticipantsPane from './_components/ParticipantsPane.svelte';
 
   let { data } = $props();
+  // Absolute URL the host can copy to invite the team (works in any browser
+  // even when pasted into a different context).
+  const inviteUrl = $derived(`${page.url.origin}/r/${data.roomId}`);
 
   // The store is destructured as `live` (not `state`) because Svelte 5's
   // runes mode reserves `$state` as a rune name — using a store called
@@ -65,6 +69,7 @@
     { label: 'History', href: `/r/${data.roomId}/history` },
     { label: 'Settings', href: `/r/${data.roomId}/settings` }
   ]}
+  {inviteUrl}
   live={$live.status === 'open'}
   showUserButton
 />

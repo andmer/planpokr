@@ -1,10 +1,12 @@
 <script lang="ts">
+  import { page } from '$app/state';
   import Topbar from '$lib/components/Topbar.svelte';
   import HistoryStrip from '$lib/components/HistoryStrip.svelte';
   import { computeStats } from '$lib/stats';
   import type { PageData } from './$types';
 
   let { data }: { data: PageData } = $props();
+  const inviteUrl = $derived(`${page.url.origin}/r/${data.room.id}`);
 
   type Verdict = 'consensus' | 'no-consensus' | 'skipped';
 
@@ -35,6 +37,7 @@
     { label: 'History', href: `/r/${data.room.id}/history`, active: true },
     { label: 'Settings', href: `/r/${data.room.id}/settings` }
   ]}
+  {inviteUrl}
   showUserButton
 />
 

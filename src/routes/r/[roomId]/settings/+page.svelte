@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { page } from '$app/state';
   import Topbar from '$lib/components/Topbar.svelte';
   import Card from '$lib/components/Card.svelte';
   import Button from '$lib/components/Button.svelte';
@@ -6,6 +7,7 @@
   import type { PageData } from './$types';
 
   let { data }: { data: PageData } = $props();
+  const inviteUrl = $derived(`${page.url.origin}/r/${data.room.id}`);
 </script>
 
 <Topbar
@@ -15,6 +17,7 @@
     { label: 'History', href: `/r/${data.room.id}/history` },
     { label: 'Settings', href: `/r/${data.room.id}/settings`, active: true }
   ]}
+  {inviteUrl}
   showUserButton
 />
 

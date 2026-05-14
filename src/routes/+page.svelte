@@ -2,9 +2,53 @@
   import { GoogleOneTap } from 'svelte-clerk';
   import Topbar from '$lib/components/Topbar.svelte';
   import Button from '$lib/components/Button.svelte';
-  import { goto } from '$app/navigation';
+  import { goto, invalidateAll } from '$app/navigation';
+  import { enhance } from '$app/forms';
 
   let { data } = $props();
+
+  // Per-card delete dropdown state. Two-step UX: open menu → confirm. The
+  // listener closes the menu on any outside click so the host doesn't get a
+  // stuck panel after dismissing without an action.
+  let openMenuId = $state<string | null>(null);
+  let confirmingId = $state<string | null>(null);
+  let pendingDeleteId = $state<string | null>(null);
+
+  function toggleMenu(id: string, e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (openMenuId === id) {
+      openMenuId = null;
+      confirmingId = null;
+    } else {
+      openMenuId = id;
+      confirmingId = null;
+    }
+  }
+  function startConfirm(id: string, e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    confirmingId = id;
+  }
+  function cancelConfirm(e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    confirmingId = null;
+    openMenuId = null;
+  }
+  function onWindowClick(e: MouseEvent) {
+    if (!openMenuId) return;
+    const target = e.target as HTMLElement | null;
+    if (target && !target.closest('.room-menu')) {
+      openMenuId = null;
+      confirmingId = null;
+    }
+  }
+  $effect(() => {
+    if (typeof window === 'undefined') return;
+    window.addEventListener('click', onWindowClick);
+    return () => window.removeEventListener('click', onWindowClick);
+  });
 
   // Home page only has the Rooms tab — History and Settings are per-room
   // and only make sense once you're inside one. Listing dead links on the
@@ -304,26 +348,85 @@
     {:else}
       <div class="room-grid">
         {#each data.rooms as room (room.id)}
-          <a href="/r/{room.id}" class="room-card">
-            <div class="room-row">
-              <span class="room-name">{room.name}</span>
-              <span class="room-slug">{room.id}</span>
-            </div>
-            <div class="room-meta">
-              <span>deck: {room.deck}</span>
-              {#if room.estimated_count > 0}
-                <span class="meta-dot">·</span>
-                <span class="room-points">
-                  {Number(room.total_points).toFixed(0)} pts
-                </span>
-                <span class="meta-dot">·</span>
-                <span>{room.estimated_count}/{room.story_count} estimated</span>
-              {:else if room.story_count > 0}
-                <span class="meta-dot">·</span>
-                <span>{room.story_count} {room.story_count === 1 ? 'story' : 'stories'}</span>
-              {/if}
-            </div>
-          </a>
+          <div class="room-card-wrap" class:deleting={pendingDeleteId === room.id}>
+            <a href="/r/{room.id}" class="room-card">
+              <div class="room-row">
+                <span class="room-name">{room.name}</span>
+                <span class="room-slug">{room.id}</span>
+              </div>
+              <div class="room-meta">
+                <span>deck: {room.deck}</span>
+                {#if room.estimated_count > 0}
+                  <span class="meta-dot">·</span>
+                  <span class="room-points">
+                    {Number(room.total_points).toFixed(0)} pts
+                  </span>
+                  <span class="meta-dot">·</span>
+                  <span>{room.estimated_count}/{room.story_count} estimated</span>
+                {:else if room.story_count > 0}
+                  <span class="meta-dot">·</span>
+                  <span>{room.story_count} {room.story_count === 1 ? 'story' : 'stories'}</span>
+                {/if}
+              </div>
+            </a>
+            {#if room.role === 'host'}
+              <div class="room-menu">
+                <button
+                  type="button"
+                  class="room-menu-trigger"
+                  onclick={(e) => toggleMenu(room.id, e)}
+                  aria-label="Room actions"
+                  aria-haspopup="true"
+                  aria-expanded={openMenuId === room.id}
+                >⋮</button>
+                {#if openMenuId === room.id}
+                  <div class="room-menu-pop" role="menu">
+                    {#if confirmingId === room.id}
+                      <p class="confirm-text">Delete this room?</p>
+                      <p class="confirm-sub">It will disappear from your list. History is preserved on the server.</p>
+                      <div class="confirm-actions">
+                        <button
+                          type="button"
+                          class="confirm-cancel"
+                          onclick={cancelConfirm}
+                        >Cancel</button>
+                        <form
+                          method="POST"
+                          action="?/archiveRoom"
+                          use:enhance={() => {
+                            pendingDeleteId = room.id;
+                            return async ({ update }) => {
+                              await update({ reset: true });
+                              await invalidateAll();
+                              pendingDeleteId = null;
+                              openMenuId = null;
+                              confirmingId = null;
+                            };
+                          }}
+                        >
+                          <input type="hidden" name="roomId" value={room.id} />
+                          <button
+                            type="submit"
+                            class="confirm-delete"
+                            disabled={pendingDeleteId === room.id}
+                          >
+                            {pendingDeleteId === room.id ? 'Deleting…' : 'Delete'}
+                          </button>
+                        </form>
+                      </div>
+                    {:else}
+                      <button
+                        type="button"
+                        class="menu-item danger"
+                        role="menuitem"
+                        onclick={(e) => startConfirm(room.id, e)}
+                      >Delete room</button>
+                    {/if}
+                  </div>
+                {/if}
+              </div>
+            {/if}
+          </div>
         {/each}
       </div>
     {/if}
@@ -683,6 +786,11 @@
     grid-template-columns: repeat(2, 1fr);
     gap: 14px;
   }
+  .room-card-wrap {
+    position: relative;
+    transition: opacity 0.2s;
+  }
+  .room-card-wrap.deleting { opacity: 0.4; pointer-events: none; }
   .room-card {
     padding: 18px 20px;
     display: block;
@@ -695,6 +803,107 @@
       transform 0.15s,
       border-color 0.15s;
   }
+  .room-menu {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 1;
+  }
+  .room-menu-trigger {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    color: var(--color-mid);
+    width: 28px;
+    height: 28px;
+    line-height: 1;
+    font-size: 18px;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+  }
+  .room-menu-trigger:hover,
+  .room-menu-trigger[aria-expanded='true'] {
+    background: var(--color-panel-3);
+    border-color: var(--color-hairline-strong);
+    color: var(--color-bright);
+  }
+  .room-menu-pop {
+    position: absolute;
+    top: 32px;
+    right: 0;
+    min-width: 220px;
+    background: var(--color-panel-2);
+    border: 1px solid var(--color-hairline-strong);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lift);
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .menu-item {
+    background: none;
+    border: none;
+    color: var(--color-text);
+    text-align: left;
+    padding: 8px 10px;
+    font-family: var(--font-sans);
+    font-size: 12.5px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.1s, color 0.1s;
+  }
+  .menu-item:hover { background: var(--color-panel-3); color: var(--color-bright); }
+  .menu-item.danger { color: var(--color-stop); }
+  .menu-item.danger:hover { background: rgb(239 68 68 / 0.08); color: #ff6b6b; }
+  .confirm-text {
+    margin: 6px 8px 4px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--color-bright);
+  }
+  .confirm-sub {
+    margin: 0 8px 8px;
+    font-size: 11.5px;
+    color: var(--color-mid);
+    line-height: 1.4;
+  }
+  .confirm-actions {
+    display: flex;
+    gap: 6px;
+    padding: 0 6px 4px;
+  }
+  .confirm-actions form { flex: 1; display: flex; }
+  .confirm-cancel {
+    flex: 1;
+    background: var(--color-panel-3);
+    border: 1px solid var(--color-hairline-strong);
+    color: var(--color-text);
+    padding: 7px 10px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .confirm-cancel:hover { background: var(--color-border); color: var(--color-bright); }
+  .confirm-delete {
+    flex: 1;
+    background: var(--color-stop);
+    border: 1px solid var(--color-stop);
+    color: #fff;
+    padding: 7px 10px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: var(--shadow-stop);
+  }
+  .confirm-delete:hover { filter: brightness(1.1); }
+  .confirm-delete:disabled { opacity: 0.6; cursor: not-allowed; }
   .room-card:hover {
     transform: translateY(-2px);
     border-color: var(--color-hairline-strong);

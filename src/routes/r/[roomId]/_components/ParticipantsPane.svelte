@@ -34,7 +34,11 @@
 </script>
 
 <aside class="pane">
-  <PaneHead hint={current && !current.revealed ? `${votedCount}/${presence.length}` : `${presence.length}`}>
+  <PaneHead
+    hint={current && !current.revealed
+      ? `${votedCount}/${presence.length} voted`
+      : `${presence.length} ${presence.length === 1 ? 'person' : 'people'}`}
+  >
     Participants
   </PaneHead>
 

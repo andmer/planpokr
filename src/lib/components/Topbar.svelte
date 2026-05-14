@@ -7,14 +7,44 @@
     nav = [],
     live = false,
     showUserButton = false,
-    showAuthCTAs = false
+    showAuthCTAs = false,
+    inviteUrl
   } = $props<{
     breadcrumb?: { label: string; kind?: 'room' | 'plain' }[];
     nav?: { label: string; href?: string; active?: boolean }[];
     live?: boolean;
     showUserButton?: boolean;
     showAuthCTAs?: boolean;
+    inviteUrl?: string;
   }>();
+
+  // Copy-to-clipboard with a brief "Copied" confirmation. Falls back to a
+  // selection-based copy when clipboard API is unavailable (rare on https).
+  let copied = $state(false);
+  let copyResetTimer: ReturnType<typeof setTimeout> | null = null;
+  async function copyLink() {
+    if (!inviteUrl) return;
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+    } catch {
+      // Older browsers / non-https contexts
+      const ta = document.createElement('textarea');
+      ta.value = inviteUrl;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+      } catch {
+        /* nothing more we can do */
+      }
+      document.body.removeChild(ta);
+    }
+    copied = true;
+    if (copyResetTimer) clearTimeout(copyResetTimer);
+    copyResetTimer = setTimeout(() => (copied = false), 1500);
+  }
 </script>
 
 <header class="topbar hairline-top">
@@ -23,6 +53,17 @@
     <span class="sep">/</span>
     <span class:room={crumb.kind === 'room'}>{crumb.label}</span>
   {/each}
+  {#if inviteUrl}
+    <button
+      type="button"
+      class="copy-link"
+      onclick={copyLink}
+      title="Copy link to share with your team"
+      aria-label="Copy room link"
+    >
+      {copied ? '✓ Copied' : 'Copy link'}
+    </button>
+  {/if}
   {#if nav.length}
     <nav>
       {#each nav as item}
@@ -81,6 +122,24 @@
   }
   .sep { color: var(--color-dim); }
   .room { color: var(--color-cyan); font-weight: 600; }
+  .copy-link {
+    margin-left: 8px;
+    background: rgb(130 215 255 / 0.08);
+    color: var(--color-cyan);
+    border: 1px solid rgb(130 215 255 / 0.25);
+    padding: 3px 9px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+  }
+  .copy-link:hover {
+    background: rgb(130 215 255 / 0.16);
+    color: var(--color-bright);
+  }
   nav { display: flex; gap: 18px; margin-left: 10px; }
   nav a, nav span { color: var(--color-mid); text-decoration: none; }
   nav a { cursor: pointer; transition: color 0.12s; }
