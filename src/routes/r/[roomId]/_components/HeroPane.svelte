@@ -25,6 +25,17 @@
   const consensusReached = $derived(
     inReveal && state.current?.stats?.verdict === 'consensus'
   );
+  // After Accept / Skip, `state.current` clears but `lastFinalized` carries
+  // the just-locked-in result so we can show it in the middle until the
+  // host moves on to another story.
+  const finalized = $derived(
+    !state.current && state.lastFinalized
+      ? {
+          ...state.lastFinalized,
+          story: state.stories.find((st) => st.id === state.lastFinalized!.storyId)
+        }
+      : null
+  );
 
   // Map server-sent priorRounds onto the shape HistoryStrip expects.
   // `role` colours the chip per voter (you/host/default); `state` ties the
@@ -65,8 +76,37 @@
   }
 </script>
 
-<section class="hero" class:revealed={inReveal}>
-  {#if !state.current}
+<section
+  class="hero"
+  class:revealed={inReveal}
+  class:finalized={!!finalized}
+>
+  {#if !state.current && finalized}
+    <!-- Show the just-locked-in story as the primary content of the hero
+         pane. Cleared on the next round_started, so picking another story
+         in the sidebar transitions naturally back into voting. -->
+    <div class="final-pane" class:skipped={finalized.kind === 'skipped'}>
+      <div class="final-tag">
+        {#if finalized.kind === 'accepted'}
+          <span class="check">✓</span> ESTIMATED
+        {:else}
+          <span class="check">↷</span> SKIPPED
+        {/if}
+      </div>
+      {#if finalized.story}
+        <h2 class="final-story">{finalized.story.title}</h2>
+        {#if finalized.story.description}
+          <p class="final-desc">{finalized.story.description}</p>
+        {/if}
+      {/if}
+      <div class="final-num">{finalized.estimate}</div>
+      {#if isHost}
+        <p class="final-hint">Pick the next story in the sidebar to continue.</p>
+      {:else}
+        <p class="final-hint">Waiting for the host to start the next round.</p>
+      {/if}
+    </div>
+  {:else if !state.current}
     <div class="empty">
       <PaneHead>Ready</PaneHead>
       <p class="empty-msg">
@@ -410,6 +450,89 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
+  }
+
+  .hero.finalized {
+    background:
+      radial-gradient(circle at 50% 0%, rgb(45 211 95 / 0.1), transparent 55%),
+      var(--color-bg-2);
+  }
+  .final-pane {
+    margin-top: 24px;
+    padding: 48px 32px 40px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    background:
+      radial-gradient(circle at 50% 0%, rgb(45 211 95 / 0.22), transparent 65%),
+      linear-gradient(180deg, var(--color-panel), var(--color-panel-2));
+    border: 1px solid rgb(45 211 95 / 0.3);
+    border-radius: var(--radius-xl);
+  }
+  .final-pane.skipped {
+    background:
+      radial-gradient(circle at 50% 0%, rgb(233 184 107 / 0.18), transparent 65%),
+      linear-gradient(180deg, var(--color-panel), var(--color-panel-2));
+    border-color: rgb(233 184 107 / 0.3);
+  }
+  .final-tag {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--color-go);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    background: rgb(45 211 95 / 0.1);
+    border: 1px solid rgb(45 211 95 / 0.3);
+    padding: 5px 12px;
+    border-radius: var(--radius-md);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .final-pane.skipped .final-tag {
+    color: var(--color-amber);
+    background: rgb(233 184 107 / 0.1);
+    border-color: rgb(233 184 107 / 0.3);
+  }
+  .final-tag .check {
+    font-size: 13px;
+    line-height: 1;
+  }
+  .final-story {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--color-bright);
+    letter-spacing: -0.025em;
+    margin: 6px 0 0;
+  }
+  .final-desc {
+    color: var(--color-mid);
+    font-size: 13px;
+    margin: 0;
+    max-width: 50ch;
+  }
+  .final-num {
+    font-size: 120px;
+    font-weight: 900;
+    color: var(--color-bright);
+    line-height: 1;
+    letter-spacing: -0.05em;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 8px 36px rgb(45 211 95 / 0.4);
+    margin: 8px 0;
+  }
+  .final-pane.skipped .final-num {
+    text-shadow: 0 8px 36px rgb(233 184 107 / 0.35);
+  }
+  .final-hint {
+    color: var(--color-mid);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    margin: 6px 0 0;
+    letter-spacing: 0.02em;
   }
   .hint {
     color: var(--color-mid);

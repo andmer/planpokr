@@ -37,6 +37,10 @@ export type LiveState = {
   stories: Story[];
   presence: Presence[];
   current: LiveCurrent | null;
+  /** Transient "you just finalised a story" record so the HeroPane can show
+   *  the locked-in result in the center until the host moves on. Cleared
+   *  when a new round starts or a different story is selected. */
+  lastFinalized: { storyId: string; estimate: string; kind: 'accepted' | 'skipped' } | null;
   myVote: string | null;
   you: { userId: string; isHost: boolean } | null;
 };
@@ -47,6 +51,7 @@ const initial: LiveState = {
   stories: [],
   presence: [],
   current: null,
+  lastFinalized: null,
   myVote: null,
   you: null
 };
@@ -114,6 +119,8 @@ export const createRoomConnection = (roomId: string): RoomConnection => {
               voted: [],
               priorRounds: msg.priorRounds ?? []
             },
+            // A new round means we've moved past the just-finalised story.
+            lastFinalized: null,
             myVote: null,
             presence: s.presence.map((p) => ({ ...p, voted: false })),
             stories: s.stories.map((st) =>
@@ -131,6 +138,11 @@ export const createRoomConnection = (roomId: string): RoomConnection => {
           return {
             ...s,
             current: null,
+            lastFinalized: {
+              storyId: msg.storyId,
+              estimate: msg.estimate,
+              kind: 'accepted'
+            },
             myVote: null,
             stories: s.stories.map((st) =>
               st.id === msg.storyId
@@ -142,6 +154,11 @@ export const createRoomConnection = (roomId: string): RoomConnection => {
           return {
             ...s,
             current: null,
+            lastFinalized: {
+              storyId: msg.storyId,
+              estimate: '—',
+              kind: 'skipped'
+            },
             myVote: null,
             stories: s.stories.map((st) =>
               st.id === msg.storyId ? { ...st, status: 'skipped' } : st
