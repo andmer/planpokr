@@ -9,7 +9,7 @@
   import Keycap from '$lib/components/Keycap.svelte';
 </script>
 
-<Topbar user={{ initial: 'E', name: 'eve' }} live />
+<Topbar live />
 <main style="padding:24px;display:grid;gap:16px">
   <div><Button>Reveal cards</Button> <Button variant="ghost">Skip</Button> <Button variant="danger">Kick</Button> <Button variant="danger-solid">Delete</Button></div>
   <div style="display:flex;gap:8px;align-items:flex-end">{#each ['0','1','2','3','5','8','13','21','?','☕'] as v}<Pcard value={v} selected={v === '5'} />{/each}</div>

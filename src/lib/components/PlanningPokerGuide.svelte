@@ -331,7 +331,7 @@
     font-size: 13px;
     line-height: 1.6;
   }
-  .steps em, .scenarios em, .fib-points em, .card-meanings em {
+  .steps em, .scenarios em, .fib-points em {
     font-style: italic;
     color: var(--color-bright);
   }

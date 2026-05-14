@@ -13,11 +13,10 @@
 <GoogleOneTap signInForceRedirectUrl="/" signUpForceRedirectUrl="/" />
 
 <main class="wrap">
-  <SignIn
-    signInForceRedirectUrl="/"
-    signUpForceRedirectUrl="/"
-    appearance={clerkAppearance}
-  />
+  <!-- forceRedirectUrl is the per-component redirect; the cross-flow
+       defaults (sign-up via this widget, etc.) come from PUBLIC_CLERK_*
+       env vars on ClerkProvider. -->
+  <SignIn forceRedirectUrl="/" appearance={clerkAppearance} />
 </main>
 
 <style>

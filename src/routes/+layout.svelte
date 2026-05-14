@@ -78,7 +78,10 @@
 
 <!-- afterSignOutUrl is a ClerkProvider/instance option, not a <UserButton /> prop —
      passing it on UserButton is silently ignored. Setting it here makes the
-     popover's "Sign out" action redirect back to the unauthenticated landing. -->
-<ClerkProvider initialState={data.initialState} {appearance} afterSignOutUrl="/">
+     popover's "Sign out" action redirect back to the unauthenticated landing.
+     `initialState` is valid (see svelte-clerk's ClerkProvider.svelte.d.ts) but
+     gets dropped by one branch of its discriminated-union prop type, so the
+     cast keeps svelte-check from rejecting an otherwise correct value. -->
+<ClerkProvider {...({ initialState: data.initialState, appearance, afterSignOutUrl: '/' } as any)}>
   {@render children()}
 </ClerkProvider>

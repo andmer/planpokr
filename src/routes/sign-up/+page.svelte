@@ -7,11 +7,7 @@
 <Topbar showAuthCTAs />
 
 <main class="wrap">
-  <SignUp
-    signInForceRedirectUrl="/"
-    signUpForceRedirectUrl="/"
-    appearance={clerkAppearance}
-  />
+  <SignUp forceRedirectUrl="/" appearance={clerkAppearance} />
 </main>
 
 <style>
