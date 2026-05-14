@@ -1,0 +1,31 @@
+# Wrangler config used only by `@sveltejs/adapter-cloudflare` during
+# `pnpm build`. It tells the adapter where to write its generated worker
+# bundle (`.svelte-kit/cloudflare/_worker.js`). Keep the bindings in sync
+# with the main `wrangler.toml`; the adapter validates them.
+#
+# The actual deploy config (Durable Object binding, migrations, secrets)
+# lives in `wrangler.toml`, which uses `src/worker.ts` as `main` so that
+# we can re-export `RoomDO` alongside the SvelteKit worker.
+
+name = "planpokr"
+main = ".svelte-kit/cloudflare/_worker.js"
+compatibility_date = "2025-09-15"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = ".svelte-kit/cloudflare"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "planpokr"
+database_id = "7ebb6512-f64d-4d3b-a909-0020838c36b9"
+migrations_dir = "migrations"
+
+[[durable_objects.bindings]]
+name = "ROOM"
+class_name = "RoomDO"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RoomDO"]
