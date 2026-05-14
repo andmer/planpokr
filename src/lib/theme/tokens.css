@@ -50,6 +50,8 @@
 
 /* Apply at root */
 html {
+  /* Tells `light-dark()` (used by Clerk's runtime CSS) to pick the dark branch. */
+  color-scheme: dark;
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-sans);

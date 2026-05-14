@@ -24,10 +24,10 @@
   );
 </script>
 
-<Topbar {user} />
+<Topbar showUserButton />
 <main class="wrap">
   <h1>New room</h1>
-  <form method="POST" action="?/default" class="form">
+  <form method="POST" class="form">
     <label class="field">
       <span class="label">Name</span>
       <input

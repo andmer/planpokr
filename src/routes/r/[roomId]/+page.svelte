@@ -59,10 +59,7 @@
 <Topbar
   breadcrumb={[{ label: $state.room?.id ?? data.roomId, kind: 'room' }]}
   live={$state.status === 'open'}
-  user={(() => {
-    const me = $state.you ? $state.presence.find((p) => p.userId === $state.you!.userId) : undefined;
-    return me ? { initial: me.initial, name: me.name } : undefined;
-  })()}
+  showUserButton
 />
 
 <div class="room-grid">

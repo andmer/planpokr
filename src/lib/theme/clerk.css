@@ -1,0 +1,215 @@
+/* ─── Clerk Auth Components — planpokr Dark Theme ─────────────────────
+   Targets Clerk's stable `.cl-*` class selectors. This is the approach
+   the algocliff codebase uses and it's more reliable than the
+   `appearance` prop, which svelte-clerk@1.1.7 does not always propagate.
+   Every value resolves to a token defined in src/lib/theme/tokens.css,
+   so a re-skin is still a one-file change.
+   ──────────────────────────────────────────────────────────────────── */
+
+/* Modern Clerk (clerk-js) styles components with `--clerk-color-*` vars and
+   `light-dark()`. We set `color-scheme: dark` in tokens.css so `light-dark()`
+   resolves to the dark branch; here we override the actual color tokens so
+   Clerk surfaces match our palette exactly (instead of Clerk's default
+   `#212126` dark fallback). The `:where(...)` keeps specificity at 0,0,0 so
+   Clerk's own `cl-internal-*` rules still win for layout details. */
+:where(html) {
+  --clerk-color-background: var(--color-panel);
+  --clerk-color-foreground: var(--color-bright);
+  --clerk-color-muted-foreground: var(--color-mid);
+  --clerk-color-neutral: #ffffff;
+  --clerk-color-border: rgb(255 255 255 / 0.16);
+  --clerk-color-input: var(--color-panel-2);
+  --clerk-color-input-foreground: var(--color-bright);
+  --clerk-color-primary: var(--color-go);
+  --clerk-color-primary-foreground: #082016;
+  --clerk-color-shadow: #000000;
+  --clerk-color-ring: var(--color-go);
+}
+
+.cl-rootBox,
+.cl-card,
+.cl-userButtonPopoverCard,
+.cl-userProfilePage,
+.cl-modalContent,
+.cl-profilePage {
+  --cl-color-background: var(--color-panel);
+  --cl-color-input-background: var(--color-bg-2);
+  --cl-color-text-primary: var(--color-bright);
+  --cl-color-text-secondary: var(--color-mid);
+}
+
+.cl-card,
+.cl-modalContent,
+.cl-userButtonPopoverCard {
+  background-color: var(--color-panel) !important;
+  border-color: var(--color-hairline-strong) !important;
+}
+
+.cl-userProfile-root,
+.cl-profilePage__root {
+  background-color: var(--color-panel) !important;
+}
+
+.cl-profileSection__profile,
+.cl-profileSection__emailAddresses,
+.cl-profileSection__connectedAccounts,
+.cl-profileSection__security,
+.cl-profileSectionContent,
+.cl-accordionTriggerButton,
+.cl-accordionContent {
+  background-color: var(--color-panel) !important;
+}
+
+.cl-navbar,
+.cl-navbarButton,
+.cl-profileSection {
+  background-color: transparent !important;
+}
+
+.cl-headerTitle,
+.cl-headerSubtitle,
+.cl-profileSectionTitle,
+.cl-profileSectionTitleText,
+.cl-userPreviewMainIdentifier,
+.cl-userPreviewSecondaryIdentifier,
+.cl-formFieldLabel,
+.cl-menuItem,
+.cl-navbarButton__active,
+.cl-accordionTriggerButton {
+  color: var(--color-bright) !important;
+}
+
+.cl-userPreviewSecondaryIdentifier,
+.cl-formFieldHintText,
+.cl-profileSectionContent__profile p,
+.cl-profileSectionContent p {
+  color: var(--color-mid) !important;
+}
+
+.cl-formFieldInput,
+.cl-selectButton {
+  background-color: var(--color-panel-2) !important;
+  border: 1px solid var(--color-border-strong) !important;
+  color: var(--color-bright) !important;
+}
+.cl-formFieldInput:focus,
+.cl-formFieldInput:focus-visible,
+.cl-selectButton:focus {
+  outline: none !important;
+  border-color: var(--color-go) !important;
+  box-shadow: 0 0 0 3px rgb(45 211 95 / 0.18) !important;
+}
+.cl-formFieldInput::placeholder {
+  color: var(--color-dim) !important;
+}
+
+.cl-formButtonPrimary {
+  background-image: linear-gradient(180deg, var(--color-go-bright), var(--color-go)) !important;
+  background-color: var(--color-go) !important;
+  color: var(--color-bright) !important;
+  font-weight: 700 !important;
+  box-shadow:
+    0 1px 0 inset rgb(255 255 255 / 0.2),
+    0 8px 18px -6px rgb(45 211 95 / 0.5) !important;
+}
+
+.cl-formButtonReset,
+.cl-footerActionLink {
+  color: var(--color-go) !important;
+}
+
+.cl-dividerLine {
+  background-color: var(--color-hairline-strong) !important;
+}
+
+.cl-badge {
+  background-color: var(--color-bg-2) !important;
+  color: var(--color-mid) !important;
+  border-color: var(--color-hairline-strong) !important;
+}
+
+.cl-menuList {
+  background-color: var(--color-panel) !important;
+  border-color: var(--color-hairline-strong) !important;
+}
+
+.cl-menuItem:hover {
+  background-color: var(--color-panel-2) !important;
+}
+
+.cl-modalBackdrop {
+  background-color: rgb(0 0 0 / 0.7) !important;
+}
+
+.cl-userButtonPopoverActionButton,
+.cl-userButtonPopoverActionButtonText {
+  color: var(--color-bright) !important;
+}
+
+.cl-userButtonPopoverActionButton:hover {
+  background-color: var(--color-panel-2) !important;
+}
+
+.cl-userButtonPopoverFooter {
+  border-top-color: var(--color-hairline-strong) !important;
+}
+
+/* Social buttons (Continue with Google, GitHub, …) */
+.cl-socialButtonsBlockButton {
+  background-color: var(--color-panel-2) !important;
+  border-color: var(--color-hairline-strong) !important;
+  color: var(--color-bright) !important;
+}
+.cl-socialButtonsBlockButton:hover {
+  background-color: var(--color-panel-3) !important;
+}
+
+/* SignIn / SignUp footer block (the "Don't have an account?" + "Secured by Clerk" +
+   "Development mode" strip that Clerk renders BELOW the card body). */
+.cl-footer,
+.cl-internalFooter,
+.cl-footerAction,
+.cl-footer__signIn,
+.cl-footer__signUp {
+  background: var(--color-bg-2) !important;
+  background-color: var(--color-bg-2) !important;
+  background-image: none !important;
+  border-color: var(--color-hairline-strong) !important;
+  color: var(--color-mid) !important;
+}
+.cl-footerActionText {
+  color: var(--color-mid) !important;
+}
+.cl-footerPagesLink,
+.cl-footerActionLink {
+  color: var(--color-go) !important;
+}
+
+/* "Secured by Clerk" line and any descendant elements (Clerk hard-codes a
+   near-black color on the inner <p>/<span>, which disappears on dark bg). */
+.cl-footer p,
+.cl-footer span,
+.cl-footer a:not(.cl-footerActionLink) {
+  color: var(--color-mid) !important;
+}
+.cl-footer svg,
+.cl-footer img {
+  fill: currentColor !important;
+  color: var(--color-mid) !important;
+  opacity: 0.85 !important;
+}
+
+/* "Development mode" badge */
+.cl-badge__developmentMode,
+.cl-internal-developmentMode,
+.cl-internalDevelopmentMode {
+  background-color: rgb(233 184 107 / 0.12) !important;
+  color: var(--color-amber) !important;
+}
+
+/* Force any nested wrapper Clerk uses for the footer container to be dark. */
+.cl-rootBox > div:has(.cl-footer),
+.cl-rootBox > div:has(.cl-footerAction),
+.cl-cardBox > div:last-child {
+  background-color: var(--color-bg-2) !important;
+}

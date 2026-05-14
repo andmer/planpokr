@@ -15,6 +15,7 @@
     { label: 'History' },
     { label: 'Settings', active: true }
   ]}
+  showUserButton
 />
 
 <main>

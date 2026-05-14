@@ -35,6 +35,7 @@
     { label: 'History', active: true },
     { label: 'Settings' }
   ]}
+  showUserButton
 />
 
 <main>

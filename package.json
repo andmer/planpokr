@@ -41,6 +41,7 @@
 	},
 	"dependencies": {
 		"@clerk/backend": "^3.4.7",
+		"@clerk/themes": "^2.4.57",
 		"svelte-clerk": "^1.1.7"
 	}
 }
