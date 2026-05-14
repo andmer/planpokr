@@ -31,9 +31,9 @@
 <Topbar
   breadcrumb={[{ label: data.room.id, kind: 'room' }]}
   nav={[
-    { label: 'Room' },
-    { label: 'History', active: true },
-    { label: 'Settings' }
+    { label: 'Room', href: `/r/${data.room.id}` },
+    { label: 'History', href: `/r/${data.room.id}/history`, active: true },
+    { label: 'Settings', href: `/r/${data.room.id}/settings` }
   ]}
   showUserButton
 />

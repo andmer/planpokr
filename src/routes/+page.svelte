@@ -6,10 +6,11 @@
 
   let { data } = $props();
 
+  // Home page only has the Rooms tab — History and Settings are per-room
+  // and only make sense once you're inside one. Listing dead links on the
+  // home topbar isn't helpful.
   const nav = $derived(
-    data.signedIn
-      ? [{ label: 'Rooms', active: true }, { label: 'History' }, { label: 'Settings' }]
-      : []
+    data.signedIn ? [{ label: 'Rooms', href: '/', active: true }] : []
   );
 
   // The classic Fibonacci-ish deck planpokr ships (matches src/routes/r/[roomId]/+page.svelte).

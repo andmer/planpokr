@@ -60,6 +60,11 @@
 
 <Topbar
   breadcrumb={[{ label: $live.room?.id ?? data.roomId, kind: 'room' }]}
+  nav={[
+    { label: 'Room', href: `/r/${data.roomId}`, active: true },
+    { label: 'History', href: `/r/${data.roomId}/history` },
+    { label: 'Settings', href: `/r/${data.roomId}/settings` }
+  ]}
   live={$live.status === 'open'}
   showUserButton
 />

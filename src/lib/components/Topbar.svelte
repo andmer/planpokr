@@ -10,7 +10,7 @@
     showAuthCTAs = false
   } = $props<{
     breadcrumb?: { label: string; kind?: 'room' | 'plain' }[];
-    nav?: { label: string; active?: boolean }[];
+    nav?: { label: string; href?: string; active?: boolean }[];
     live?: boolean;
     showUserButton?: boolean;
     showAuthCTAs?: boolean;
@@ -25,7 +25,13 @@
   {/each}
   {#if nav.length}
     <nav>
-      {#each nav as item}<a class:active={item.active}>{item.label}</a>{/each}
+      {#each nav as item}
+        {#if item.href}
+          <a href={item.href} class:active={item.active}>{item.label}</a>
+        {:else}
+          <span class:active={item.active}>{item.label}</span>
+        {/if}
+      {/each}
     </nav>
   {/if}
   {#if live}<span class="conn">LIVE</span>{/if}
@@ -76,8 +82,10 @@
   .sep { color: var(--color-dim); }
   .room { color: var(--color-cyan); font-weight: 600; }
   nav { display: flex; gap: 18px; margin-left: 10px; }
-  nav a { color: var(--color-mid); cursor: pointer; }
-  nav a.active { color: var(--color-bright); font-weight: 700; }
+  nav a, nav span { color: var(--color-mid); text-decoration: none; }
+  nav a { cursor: pointer; transition: color 0.12s; }
+  nav a:hover { color: var(--color-bright); }
+  nav a.active, nav span.active { color: var(--color-bright); font-weight: 700; }
   .conn {
     margin-left: auto;
     color: var(--color-go);
