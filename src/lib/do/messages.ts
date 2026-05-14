@@ -60,6 +60,12 @@ export type CurrentRound =
     }
   | null;
 
+export type LastFinalized = {
+  storyId: string;
+  estimate: string;
+  kind: 'accepted' | 'skipped';
+};
+
 export type ServerMsg =
   | {
       type: 'state';
@@ -67,6 +73,11 @@ export type ServerMsg =
       stories: Story[];
       presence: Presence[];
       current: CurrentRound;
+      /** The most-recently-finalised story for this room, surfaced so clients
+       *  (re)joining see the locked-in result in the centre pane instead of
+       *  the empty "no active round" state. Null when nothing has been
+       *  estimated/skipped yet, or when a new round is in progress. */
+      lastFinalized: LastFinalized | null;
       you: { userId: string; isHost: boolean };
     }
   | {

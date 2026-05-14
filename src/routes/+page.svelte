@@ -308,7 +308,20 @@
               <span class="room-name">{room.name}</span>
               <span class="room-slug">{room.id}</span>
             </div>
-            <div class="room-meta">deck: {room.deck}</div>
+            <div class="room-meta">
+              <span>deck: {room.deck}</span>
+              {#if room.estimated_count > 0}
+                <span class="meta-dot">·</span>
+                <span class="room-points">
+                  {Number(room.total_points).toFixed(0)} pts
+                </span>
+                <span class="meta-dot">·</span>
+                <span>{room.estimated_count}/{room.story_count} estimated</span>
+              {:else if room.story_count > 0}
+                <span class="meta-dot">·</span>
+                <span>{room.story_count} {room.story_count === 1 ? 'story' : 'stories'}</span>
+              {/if}
+            </div>
           </a>
         {/each}
       </div>
@@ -712,5 +725,21 @@
     color: var(--color-mid);
     font-size: 12px;
     font-family: var(--font-mono);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .room-meta .meta-dot {
+    color: var(--color-dim);
+  }
+  .room-points {
+    color: var(--color-go);
+    font-weight: 700;
+    background: rgb(45 211 95 / 0.08);
+    border: 1px solid rgb(45 211 95 / 0.25);
+    padding: 1px 7px;
+    border-radius: var(--radius-sm);
+    font-variant-numeric: tabular-nums;
   }
 </style>

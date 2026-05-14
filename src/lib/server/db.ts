@@ -52,17 +52,36 @@ export const ensureMember = async (
     .run();
 };
 
+/** Per-room rollup for the rooms list: how many stories the team has
+ *  estimated, and the total story points (sum of numeric `final_estimate`s).
+ *  Non-numeric final estimates from the deck (`?`, `☕`) coerce to 0 via
+ *  CAST, so they don't poison the total. */
 export const listUserRooms = (db: D1Database, userId: string) =>
   db
     .prepare(
-      `SELECT r.*, rm.role
+      `SELECT r.*, rm.role,
+        (SELECT COUNT(*) FROM stories s WHERE s.room_id = r.id) AS story_count,
+        (SELECT COUNT(*) FROM stories s WHERE s.room_id = r.id AND s.status = 'estimated') AS estimated_count,
+        COALESCE(
+          (SELECT SUM(CAST(s.final_estimate AS REAL))
+             FROM stories s
+            WHERE s.room_id = r.id AND s.status = 'estimated'),
+          0
+        ) AS total_points
      FROM rooms r
      JOIN room_members rm ON rm.room_id = r.id
      WHERE rm.user_id = ? AND r.archived_at IS NULL
      ORDER BY r.created_at DESC`
     )
     .bind(userId)
-    .all<Room & { role: MemberRole }>();
+    .all<
+      Room & {
+        role: MemberRole;
+        story_count: number;
+        estimated_count: number;
+        total_points: number;
+      }
+    >();
 
 export const listStories = (db: D1Database, roomId: string) =>
   db

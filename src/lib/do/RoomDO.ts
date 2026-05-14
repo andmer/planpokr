@@ -10,7 +10,13 @@
 
 import { DurableObject } from 'cloudflare:workers';
 import { verifyRoomToken, type RoomClaims } from '$lib/server/auth';
-import type { ClientMsg, ServerMsg, Presence, PriorRound } from './messages';
+import type {
+  ClientMsg,
+  ServerMsg,
+  Presence,
+  PriorRound,
+  LastFinalized
+} from './messages';
 import { computeStats } from '$lib/stats';
 import type { Story, VoteRound, Vote } from '$lib/types';
 
@@ -89,6 +95,16 @@ export class RoomDO extends DurableObject<Env> {
     const v = await this.ctx.storage.get<string>('roomId');
     if (!v) throw new Error('roomId not initialized');
     return v;
+  }
+
+  /** Persisted across hibernation so that clients (re)joining always see the
+   *  most recent finalised result in the HeroPane, not a blank empty state. */
+  private async getLastFinalized(): Promise<LastFinalized | null> {
+    return (await this.ctx.storage.get<LastFinalized>('lastFinalized')) ?? null;
+  }
+  private async setLastFinalized(v: LastFinalized | null): Promise<void> {
+    if (v) await this.ctx.storage.put('lastFinalized', v);
+    else await this.ctx.storage.delete('lastFinalized');
   }
 
   // ---- DO fetch handler ----
@@ -185,6 +201,8 @@ export class RoomDO extends DurableObject<Env> {
           revealed: false,
           pre: new Map()
         };
+        // Starting a new round means we've moved past the prior result.
+        await this.setLastFinalized(null);
         const priorRounds = await this.priorRoundsForStory(msg.storyId);
         this.broadcast({
           type: 'round_started',
@@ -251,6 +269,11 @@ export class RoomDO extends DurableObject<Env> {
             "UPDATE stories SET status = 'estimated', final_estimate = ?, final_round_id = ? WHERE id = ?"
           ).bind(msg.value, roundId, storyId)
         ]);
+        await this.setLastFinalized({
+          storyId,
+          estimate: msg.value,
+          kind: 'accepted'
+        });
         this.broadcast({
           type: 'accepted',
           storyId,
@@ -285,6 +308,7 @@ export class RoomDO extends DurableObject<Env> {
           revealed: false,
           pre: new Map()
         };
+        await this.setLastFinalized(null);
         const priorRounds = await this.priorRoundsForStory(storyId);
         this.broadcast({
           type: 'round_started',
@@ -305,6 +329,7 @@ export class RoomDO extends DurableObject<Env> {
         )
           .bind(storyId)
           .run();
+        await this.setLastFinalized({ storyId, estimate: '—', kind: 'skipped' });
         this.broadcast({ type: 'skipped', storyId });
         this.current = null;
         return;
@@ -441,6 +466,10 @@ export class RoomDO extends DurableObject<Env> {
         }
       : null;
 
+    // Only surface lastFinalized when there is no active round — otherwise
+    // the active round is the relevant context, not the prior result.
+    const lastFinalized = current ? null : await this.getLastFinalized();
+
     const msg: ServerMsg = {
       type: 'state',
       room: {
@@ -452,6 +481,7 @@ export class RoomDO extends DurableObject<Env> {
       stories,
       presence: await this.presence(),
       current,
+      lastFinalized,
       you: {
         userId: claims.userId,
         isHost: room.host_user_id === claims.userId

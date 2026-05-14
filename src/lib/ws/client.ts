@@ -90,6 +90,7 @@ export const createRoomConnection = (roomId: string): RoomConnection => {
                   priorRounds: msg.current.priorRounds ?? []
                 }
               : null,
+            lastFinalized: msg.lastFinalized ?? null,
             you: msg.you,
             status: 'open'
           };
