@@ -22,9 +22,10 @@ tag = "v1"
 new_sqlite_classes = ["RoomDO"]
 
 [vars]
-# non-secret values go here
+# Clerk publishable key is safe to commit (it's used in the client bundle).
+PUBLIC_CLERK_PUBLISHABLE_KEY = "pk_live_Y2xlcmsucGxhbnBva3IuY29tJA"
+CLERK_PUBLISHABLE_KEY = "pk_live_Y2xlcmsucGxhbnBva3IuY29tJA"
 
-# Secrets (set via `wrangler secret put`):
+# Secrets (set via `wrangler secret put`, never committed):
 #   CLERK_SECRET_KEY
-#   CLERK_PUBLISHABLE_KEY
 #   ROOM_TOKEN_SECRET
