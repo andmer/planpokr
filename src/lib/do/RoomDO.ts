@@ -10,9 +10,9 @@
 
 import { DurableObject } from 'cloudflare:workers';
 import { verifyRoomToken, type RoomClaims } from '$lib/server/auth';
-import type { ClientMsg, ServerMsg, Presence } from './messages';
+import type { ClientMsg, ServerMsg, Presence, PriorRound } from './messages';
 import { computeStats } from '$lib/stats';
-import type { Story } from '$lib/types';
+import type { Story, VoteRound, Vote } from '$lib/types';
 
 type Env = { DB: D1Database; ROOM_TOKEN_SECRET: string };
 
@@ -185,11 +185,13 @@ export class RoomDO extends DurableObject<Env> {
           revealed: false,
           pre: new Map()
         };
+        const priorRounds = await this.priorRoundsForStory(msg.storyId);
         this.broadcast({
           type: 'round_started',
           storyId: msg.storyId,
           roundId,
-          roundNumber
+          roundNumber,
+          priorRounds
         });
         return;
       }
@@ -283,11 +285,13 @@ export class RoomDO extends DurableObject<Env> {
           revealed: false,
           pre: new Map()
         };
+        const priorRounds = await this.priorRoundsForStory(storyId);
         this.broadcast({
           type: 'round_started',
           storyId,
           roundId,
-          roundNumber
+          roundNumber,
+          priorRounds
         });
         return;
       }
@@ -432,7 +436,8 @@ export class RoomDO extends DurableObject<Env> {
           roundId: this.current.roundId,
           roundNumber: this.current.roundNumber,
           revealed: this.current.revealed,
-          voted: Array.from(this.current.pre.keys())
+          voted: Array.from(this.current.pre.keys()),
+          priorRounds: await this.priorRoundsForStory(this.current.storyId)
         }
       : null;
 
@@ -457,6 +462,55 @@ export class RoomDO extends DurableObject<Env> {
     } catch {
       /* ignore */
     }
+  }
+
+  /** Fetch all revealed rounds for a story (oldest first), each with its
+   *  individual votes joined to user display names and pre-computed stats.
+   *  Used to feed the in-room "previous rounds" strip so the UI doesn't need
+   *  a separate REST endpoint or to know the DB schema. */
+  private async priorRoundsForStory(storyId: string): Promise<PriorRound[]> {
+    const db = this.env.DB;
+    const rounds = (
+      await db
+        .prepare(
+          'SELECT * FROM vote_rounds WHERE story_id = ? AND revealed_at IS NOT NULL ORDER BY round_number'
+        )
+        .bind(storyId)
+        .all<VoteRound>()
+    ).results;
+    if (!rounds.length) return [];
+
+    const roundIds = rounds.map((r) => r.id);
+    type VoteRow = Vote & { display_name: string };
+    const voteRows = (
+      await db
+        .prepare(
+          `SELECT v.*, u.display_name FROM votes v
+           JOIN users u ON u.id = v.user_id
+           WHERE round_id IN (${roundIds.map(() => '?').join(',')})`
+        )
+        .bind(...roundIds)
+        .all<VoteRow>()
+    ).results;
+
+    const byRound: Record<string, VoteRow[]> = {};
+    for (const v of voteRows) (byRound[v.round_id] ??= []).push(v);
+
+    return rounds.map((r) => {
+      const vs = byRound[r.id] ?? [];
+      const votesMap = Object.fromEntries(vs.map((v) => [v.user_id, v.value]));
+      return {
+        roundNumber: r.round_number,
+        votes: vs.map((v) => ({
+          userId: v.user_id,
+          initial: (v.display_name?.[0] ?? '?').toUpperCase(),
+          name: v.display_name ?? 'anon',
+          value: v.value
+        })),
+        stats: computeStats(votesMap),
+        acceptedEstimate: r.accepted_estimate
+      };
+    });
   }
 
   private async flushVotes(

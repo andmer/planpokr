@@ -4,6 +4,7 @@
   import Button from '$lib/components/Button.svelte';
   import Keycap from '$lib/components/Keycap.svelte';
   import Verdict from '$lib/components/Verdict.svelte';
+  import HistoryStrip from '$lib/components/HistoryStrip.svelte';
   import { DECKS } from '$lib/decks';
   import type { LiveState } from '$lib/ws/client';
   import type { ClientMsg } from '$lib/do/messages';
@@ -21,6 +22,33 @@
   const isHost = $derived(state.you?.isHost ?? false);
   const inVoting = $derived(!!state.current && !state.current.revealed);
   const inReveal = $derived(state.current?.revealed ?? false);
+
+  // Map server-sent priorRounds onto the shape HistoryStrip expects.
+  // `role` colours the chip per voter (you/host/default); `state` ties the
+  // chip border to the round's verdict so divergent rounds read as red.
+  const priorRoundsForStrip = $derived(
+    (state.current?.priorRounds ?? []).map((pr) => ({
+      num: pr.roundNumber,
+      votes: pr.votes.map((v) => ({
+        initial: v.initial,
+        value: v.value,
+        role:
+          v.userId === state.you?.userId
+            ? ('you' as const)
+            : v.userId === state.room?.hostUserId
+              ? ('host' as const)
+              : ('default' as const),
+        state:
+          pr.stats.verdict === 'consensus'
+            ? ('consensus' as const)
+            : ('divergent' as const)
+      })),
+      median: pr.stats.median,
+      range: pr.stats.range,
+      verdict: pr.stats.verdict,
+      estimate: pr.acceptedEstimate ?? undefined
+    }))
+  );
 
   function pickCard(v: string) {
     if (!inVoting) return;
@@ -120,6 +148,13 @@
           </span>
         </div>
       {/if}
+    {/if}
+
+    {#if priorRoundsForStrip.length}
+      <div class="prior">
+        <PaneHead>Previous rounds</PaneHead>
+        <HistoryStrip rounds={priorRoundsForStrip} />
+      </div>
     {/if}
   {/if}
 </section>
@@ -248,6 +283,12 @@
     gap: 16px;
     margin-top: 8px;
     flex-wrap: wrap;
+  }
+  .prior {
+    margin-top: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
   }
   .hint {
     color: var(--color-mid);

@@ -9,8 +9,16 @@
 // pick that up reactively.
 
 import { writable, type Writable } from 'svelte/store';
-import type { ClientMsg, ServerMsg, Presence, RevealStats } from '$lib/do/messages';
+import type {
+  ClientMsg,
+  ServerMsg,
+  Presence,
+  RevealStats,
+  PriorRound
+} from '$lib/do/messages';
 import type { Story, Deck } from '$lib/types';
+
+export type { PriorRound };
 
 export type LiveCurrent = {
   storyId: string;
@@ -20,6 +28,7 @@ export type LiveCurrent = {
   votes?: Record<string, string>;
   voted?: string[];
   stats?: RevealStats;
+  priorRounds?: PriorRound[];
 };
 
 export type LiveState = {
@@ -72,7 +81,8 @@ export const createRoomConnection = (roomId: string): RoomConnection => {
                   revealed: msg.current.revealed,
                   votes: msg.current.votes,
                   voted: msg.current.voted,
-                  stats: msg.current.stats
+                  stats: msg.current.stats,
+                  priorRounds: msg.current.priorRounds ?? []
                 }
               : null,
             you: msg.you,
@@ -101,7 +111,8 @@ export const createRoomConnection = (roomId: string): RoomConnection => {
               roundId: msg.roundId,
               roundNumber: msg.roundNumber,
               revealed: false,
-              voted: []
+              voted: [],
+              priorRounds: msg.priorRounds ?? []
             },
             myVote: null,
             presence: s.presence.map((p) => ({ ...p, voted: false })),

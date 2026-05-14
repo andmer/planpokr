@@ -31,6 +31,20 @@ export type Presence = {
   voted: boolean;
 };
 
+export type PriorRoundVote = {
+  userId: string;
+  initial: string;
+  name: string;
+  value: string;
+};
+
+export type PriorRound = {
+  roundNumber: number;
+  votes: PriorRoundVote[];
+  stats: RevealStats;
+  acceptedEstimate: string | null;
+};
+
 export type CurrentRound =
   | {
       storyId: string;
@@ -41,6 +55,8 @@ export type CurrentRound =
       /** userIds that have voted in the current (pre-reveal) round. */
       voted: string[];
       stats?: RevealStats;
+      /** Revealed earlier rounds for the same story, oldest first. */
+      priorRounds?: PriorRound[];
     }
   | null;
 
@@ -63,6 +79,10 @@ export type ServerMsg =
       storyId: string;
       roundId: string;
       roundNumber: number;
+      /** Snapshot of previously-revealed rounds for this story at the moment
+       *  the new round starts. Lets the UI surface "what we voted last time"
+       *  the instant a re-vote begins, without an extra round-trip. */
+      priorRounds: PriorRound[];
     }
   | {
       type: 'revealed';
