@@ -233,6 +233,77 @@ export class RoomDO extends DurableObject<Env> {
         return;
       }
 
+      case 'accept': {
+        if (s.role !== 'host') return this.errTo(ws, 'not_host', 'host only');
+        if (!this.current?.revealed) {
+          return this.errTo(ws, 'stale', 'reveal first');
+        }
+        const { roundId, storyId } = this.current;
+        await this.env.DB.batch([
+          this.env.DB.prepare(
+            'UPDATE vote_rounds SET accepted_estimate = ? WHERE id = ?'
+          ).bind(msg.value, roundId),
+          this.env.DB.prepare(
+            "UPDATE stories SET status = 'estimated', final_estimate = ?, final_round_id = ? WHERE id = ?"
+          ).bind(msg.value, roundId, storyId)
+        ]);
+        this.broadcast({
+          type: 'accepted',
+          storyId,
+          estimate: msg.value
+        });
+        this.current = null;
+        return;
+      }
+
+      case 'revote': {
+        if (s.role !== 'host') return this.errTo(ws, 'not_host', 'host only');
+        if (!this.current?.revealed) {
+          return this.errTo(ws, 'stale', 'reveal first');
+        }
+        const storyId = this.current.storyId;
+        const next = await this.env.DB.prepare(
+          'SELECT COALESCE(MAX(round_number), 0) + 1 AS n FROM vote_rounds WHERE story_id = ?'
+        )
+          .bind(storyId)
+          .first<{ n: number }>();
+        const roundNumber = next?.n ?? 1;
+        const roundId = crypto.randomUUID();
+        await this.env.DB.prepare(
+          'INSERT INTO vote_rounds (id, story_id, round_number, started_at) VALUES (?, ?, ?, ?)'
+        )
+          .bind(roundId, storyId, roundNumber, Date.now())
+          .run();
+        this.current = {
+          storyId,
+          roundId,
+          roundNumber,
+          revealed: false,
+          pre: new Map()
+        };
+        this.broadcast({
+          type: 'round_started',
+          storyId,
+          roundId,
+          roundNumber
+        });
+        return;
+      }
+
+      case 'skip': {
+        if (s.role !== 'host') return this.errTo(ws, 'not_host', 'host only');
+        if (!this.current) return;
+        const storyId = this.current.storyId;
+        await this.env.DB.prepare(
+          "UPDATE stories SET status = 'skipped' WHERE id = ?"
+        )
+          .bind(storyId)
+          .run();
+        this.broadcast({ type: 'skipped', storyId });
+        this.current = null;
+        return;
+      }
+
       default:
         return this.errTo(
           ws,
