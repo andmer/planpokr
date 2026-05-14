@@ -10,16 +10,18 @@
 
   let { data } = $props();
 
-  // We keep the writable store and read it in templates via `$state.*` (the
-  // Svelte store auto-subscribe syntax). `send` is a plain function; `close`
-  // is wired to onDestroy. The keyboard handler reads the store via `get()`
-  // (not the `$` prefix, which is parser-magical only inside templates).
+  // The store is destructured as `live` (not `state`) because Svelte 5's
+  // runes mode reserves `$state` as a rune name — using a store called
+  // `state` would make `$state.foo` ambiguous and breaks SSR with
+  // "store.subscribe is not a function". `$live` is the auto-subscribe.
+  // `send` is a plain function; `close` is wired to onDestroy. The keyboard
+  // handler reads the store via `get()` (the `$` prefix is template-only).
   // `data.roomId` is reactive (from `$props()`), but the WebSocket
   // connection is bound to the room for the lifetime of this page mount.
   // SvelteKit re-mounts the page on roomId param change, so capturing the
   // initial value via `untrack` is correct here.
   const conn = createRoomConnection(untrack(() => data.roomId));
-  const { state, send, setMyVote, close } = conn;
+  const { state: live, send, setMyVote, close } = conn;
 
   onDestroy(close);
 
@@ -34,7 +36,7 @@
       ) {
         return;
       }
-      const s = get(state);
+      const s = get(live);
       if (!s.you?.isHost || !s.current) return;
       const k = e.key.toLowerCase();
       if (k === 'r' && !s.current.revealed) {
@@ -57,31 +59,31 @@
 </script>
 
 <Topbar
-  breadcrumb={[{ label: $state.room?.id ?? data.roomId, kind: 'room' }]}
-  live={$state.status === 'open'}
+  breadcrumb={[{ label: $live.room?.id ?? data.roomId, kind: 'room' }]}
+  live={$live.status === 'open'}
   showUserButton
 />
 
 <div class="room-grid">
   <StoriesPane
     roomId={data.roomId}
-    stories={$state.stories}
-    current={$state.current}
-    isHost={$state.you?.isHost ?? false}
+    stories={$live.stories}
+    current={$live.current}
+    isHost={$live.you?.isHost ?? false}
     {send}
   />
-  <HeroPane state={$state} {send} {setMyVote} />
+  <HeroPane state={$live} {send} {setMyVote} />
   <ParticipantsPane
-    presence={$state.presence}
-    current={$state.current}
-    hostUserId={$state.room?.hostUserId}
-    youUserId={$state.you?.userId}
+    presence={$live.presence}
+    current={$live.current}
+    hostUserId={$live.room?.hostUserId}
+    youUserId={$live.you?.userId}
   />
 </div>
 
 <Statusbar
-  items={$state.you?.isHost && $state.current
-    ? $state.current.revealed
+  items={$live.you?.isHost && $live.current
+    ? $live.current.revealed
       ? [
           { key: '↵', label: 'accept' },
           { key: 'R', label: 're-vote' },
@@ -92,8 +94,8 @@
           { key: 'S', label: 'skip' }
         ]
     : [{ key: '/', label: 'search' }]}
-  right={$state.room
-    ? `${$state.room.deck} · ${$state.presence.length} online · ${$state.status}`
+  right={$live.room
+    ? `${$live.room.deck} · ${$live.presence.length} online · ${$live.status}`
     : 'connecting…'}
 />
 
