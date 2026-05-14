@@ -436,7 +436,7 @@ export class RoomDO extends DurableObject<Env> {
           roundId: this.current.roundId,
           roundNumber: this.current.roundNumber,
           revealed: this.current.revealed,
-          pending: Array.from(this.current.pre.keys())
+          voted: Array.from(this.current.pre.keys())
         }
       : null;
 

@@ -35,7 +35,9 @@ export type CurrentRound =
       roundNumber: number;
       revealed: boolean;
       votes?: Record<string, string>;
-      pending: string[];
+      /** userIds that have voted in the current (pre-reveal) round. */
+      voted: string[];
+      stats?: RevealStats;
     }
   | null;
 
