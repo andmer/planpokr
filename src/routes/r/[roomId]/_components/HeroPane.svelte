@@ -138,7 +138,14 @@
           <p class="final-desc">{finalized.story.description}</p>
         {/if}
       {/if}
-      <div class="final-num">{finalized.estimate}</div>
+      {#if finalized.kind === 'accepted'}
+        <div class="final-num">{finalized.estimate}</div>
+      {:else}
+        <!-- Skipped stories have no meaningful estimate. Rendering the
+             em-dash at 120px looked like a giant white bar; instead show
+             a small muted "No estimate" label so the layout breathes. -->
+        <div class="final-skipped-note">No estimate</div>
+      {/if}
       {#if isHost}
         <div class="final-actions">
           <Button
@@ -608,6 +615,13 @@
   }
   .final-pane.skipped .final-num {
     text-shadow: 0 8px 36px rgb(233 184 107 / 0.35);
+  }
+  .final-skipped-note {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    color: var(--color-mid);
+    letter-spacing: 0.04em;
+    padding: 16px 0;
   }
   .final-actions {
     margin-top: 8px;
