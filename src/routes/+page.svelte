@@ -378,7 +378,11 @@
                   aria-label="Room actions"
                   aria-haspopup="true"
                   aria-expanded={openMenuId === room.id}
-                >⋮</button>
+                >
+                  <span class="dots">
+                    <span></span><span></span><span></span>
+                  </span>
+                </button>
                 {#if openMenuId === room.id}
                   <div class="room-menu-pop" role="menu">
                     {#if confirmingId === room.id}
@@ -792,7 +796,9 @@
   }
   .room-card-wrap.deleting { opacity: 0.4; pointer-events: none; }
   .room-card {
-    padding: 18px 20px;
+    /* Right padding leaves room for the absolute-positioned menu trigger
+       so the room slug pill doesn't slide under it. */
+    padding: 18px 56px 18px 20px;
     display: block;
     background: linear-gradient(180deg, var(--color-panel), var(--color-panel-2));
     border: 1px solid var(--color-hairline);
@@ -805,29 +811,47 @@
   }
   .room-menu {
     position: absolute;
-    top: 8px;
-    right: 8px;
-    z-index: 1;
+    top: 12px;
+    right: 12px;
+    z-index: 2;
   }
   .room-menu-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     background: transparent;
     border: 1px solid transparent;
     border-radius: var(--radius-md);
-    color: var(--color-mid);
     width: 28px;
     height: 28px;
-    line-height: 1;
-    font-size: 18px;
-    font-weight: 700;
     cursor: pointer;
     padding: 0;
-    transition: background 0.12s, color 0.12s, border-color 0.12s;
+    transition: background 0.12s, border-color 0.12s;
   }
   .room-menu-trigger:hover,
   .room-menu-trigger[aria-expanded='true'] {
     background: var(--color-panel-3);
     border-color: var(--color-hairline-strong);
-    color: var(--color-bright);
+  }
+  .room-menu-trigger .dots {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    height: 18px;
+    width: 4px;
+  }
+  .room-menu-trigger .dots span {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--color-mid);
+    transition: background 0.12s;
+  }
+  .room-menu-trigger:hover .dots span,
+  .room-menu-trigger[aria-expanded='true'] .dots span {
+    background: var(--color-bright);
   }
   .room-menu-pop {
     position: absolute;
