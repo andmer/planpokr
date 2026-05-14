@@ -22,6 +22,9 @@
   const isHost = $derived(state.you?.isHost ?? false);
   const inVoting = $derived(!!state.current && !state.current.revealed);
   const inReveal = $derived(state.current?.revealed ?? false);
+  const consensusReached = $derived(
+    inReveal && state.current?.stats?.verdict === 'consensus'
+  );
 
   // Map server-sent priorRounds onto the shape HistoryStrip expects.
   // `role` colours the chip per voter (you/host/default); `state` ties the
@@ -103,12 +106,43 @@
           </span>
         </div>
       {/if}
+    {:else if state.current.revealed && consensusReached}
+      <!-- Consensus path: simplified celebratory display. Per-voter chips and
+           median/range row hidden — everyone voted the same, so there's
+           nothing extra to read. Big number + primary Accept + secondary
+           re-vote/skip for the edge case where the host wants to overturn. -->
+      <div class="consensus-pane">
+        <div class="consensus-tag">
+          <span class="check">✓</span> CONSENSUS REACHED
+        </div>
+        <div class="consensus-num">{state.current.stats?.median ?? '?'}</div>
+        <div class="consensus-meta">
+          {Object.keys(state.current.votes ?? {}).length} of {state.presence.length} agreed
+        </div>
+        {#if isHost}
+          <div class="consensus-ctrl">
+            <Button
+              onclick={() => send({ type: 'accept', value: state.current?.stats?.median ?? '?' })}
+            >
+              Accept estimate · {state.current.stats?.median ?? '?'}
+            </Button>
+            <div class="secondary">
+              <button class="link" onclick={() => send({ type: 'revote' })}>Re-vote</button>
+              <span class="dot">·</span>
+              <button class="link" onclick={() => send({ type: 'skip' })}>Skip</button>
+              <span class="hint">
+                <Keycap>↵</Keycap> accept <Keycap>R</Keycap> revote <Keycap>S</Keycap> skip
+              </span>
+            </div>
+          </div>
+        {/if}
+      </div>
     {:else if state.current.revealed}
       <PaneHead>Round {state.current.roundNumber} · Reveal</PaneHead>
       <div class="reveal-cards">
         {#each Object.entries(state.current.votes ?? {}) as [uid, value] (uid)}
           {@const member = state.presence.find((p) => p.userId === uid)}
-          <div class="reveal-card" class:consensus={state.current?.stats?.verdict === 'consensus'}>
+          <div class="reveal-card">
             <Pcard value={String(value)} size="lg" />
             <div class="voter">{member?.initial ?? '?'} {member?.name ?? ''}</div>
           </div>
@@ -289,6 +323,93 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
+  }
+
+  .consensus-pane {
+    margin-top: 12px;
+    padding: 36px 28px 32px;
+    background:
+      radial-gradient(circle at 50% 0%, rgb(45 211 95 / 0.18), transparent 65%),
+      linear-gradient(180deg, var(--color-panel), var(--color-panel-2));
+    border: 1px solid rgb(45 211 95 / 0.3);
+    border-radius: var(--radius-xl);
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+  .consensus-tag {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--color-go);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    background: rgb(45 211 95 / 0.1);
+    border: 1px solid rgb(45 211 95 / 0.3);
+    padding: 5px 12px;
+    border-radius: var(--radius-md);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .consensus-tag .check {
+    font-size: 13px;
+    line-height: 1;
+  }
+  .consensus-num {
+    font-size: 96px;
+    font-weight: 900;
+    color: var(--color-bright);
+    line-height: 1;
+    letter-spacing: -0.05em;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 6px 30px rgb(45 211 95 / 0.35);
+  }
+  .consensus-meta {
+    color: var(--color-mid);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+  }
+  .consensus-ctrl {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+  }
+  .secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--color-mid);
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+  .secondary .link {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--color-mid);
+    font: inherit;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .secondary .link:hover {
+    color: var(--color-bright);
+  }
+  .secondary .dot {
+    color: var(--color-dim);
+  }
+  .secondary .hint {
+    margin-left: 8px;
+    color: var(--color-mid);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
   }
   .hint {
     color: var(--color-mid);
