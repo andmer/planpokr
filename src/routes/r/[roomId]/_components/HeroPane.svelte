@@ -25,6 +25,45 @@
   const consensusReached = $derived(
     inReveal && state.current?.stats?.verdict === 'consensus'
   );
+
+  // Auto-accept on consensus: when the host reaches consensus on a reveal,
+  // run a 5s countdown then fire `accept` automatically. Re-vote / Skip
+  // (or anything that takes consensusReached false) cancels the timer.
+  // Keeps host attention on the room without requiring an extra click for
+  // the common case, while leaving an escape hatch for the rare misvote.
+  const AUTO_ACCEPT_SECONDS = 5;
+  let countdown = $state<number | null>(null);
+  let countdownTimer: ReturnType<typeof setInterval> | null = null;
+
+  function cancelCountdown() {
+    if (countdownTimer) {
+      clearInterval(countdownTimer);
+      countdownTimer = null;
+    }
+    countdown = null;
+  }
+  function startCountdown() {
+    cancelCountdown();
+    countdown = AUTO_ACCEPT_SECONDS;
+    countdownTimer = setInterval(() => {
+      countdown = (countdown ?? 0) - 1;
+      if ((countdown ?? 0) <= 0) {
+        cancelCountdown();
+        send({ type: 'accept', value: state.current?.stats?.median ?? '?' });
+      }
+    }, 1000);
+  }
+  $effect(() => {
+    if (consensusReached && isHost) {
+      // Use roundId as an effect dependency so a re-vote landing on
+      // consensus again restarts the countdown for the new round.
+      void state.current?.roundId;
+      startCountdown();
+    } else {
+      cancelCountdown();
+    }
+    return cancelCountdown;
+  });
   // After Accept / Skip, `state.current` clears but `lastFinalized` carries
   // the just-locked-in result so we can show it in the middle until the
   // host moves on to another story.
@@ -162,14 +201,39 @@
         {#if isHost}
           <div class="consensus-ctrl">
             <Button
-              onclick={() => send({ type: 'accept', value: state.current?.stats?.median ?? '?' })}
+              onclick={() => {
+                cancelCountdown();
+                send({ type: 'accept', value: state.current?.stats?.median ?? '?' });
+              }}
             >
               Accept estimate · {state.current.stats?.median ?? '?'}
             </Button>
+            {#if countdown !== null}
+              <div class="countdown" aria-live="polite">
+                Auto-accepting in <strong>{countdown}s</strong>
+                · <button
+                  type="button"
+                  class="link"
+                  onclick={cancelCountdown}
+                >Cancel</button>
+              </div>
+            {/if}
             <div class="secondary">
-              <button class="link" onclick={() => send({ type: 'revote' })}>Re-vote</button>
+              <button
+                class="link"
+                onclick={() => {
+                  cancelCountdown();
+                  send({ type: 'revote' });
+                }}
+              >Re-vote</button>
               <span class="dot">·</span>
-              <button class="link" onclick={() => send({ type: 'skip' })}>Skip</button>
+              <button
+                class="link"
+                onclick={() => {
+                  cancelCountdown();
+                  send({ type: 'skip' });
+                }}
+              >Skip</button>
               <span class="hint">
                 <Keycap>↵</Keycap> accept <Keycap>R</Keycap> revote <Keycap>S</Keycap> skip
               </span>
@@ -450,6 +514,16 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
+  }
+  .countdown {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--color-go);
+    letter-spacing: 0.04em;
+  }
+  .countdown strong {
+    color: var(--color-bright);
+    font-variant-numeric: tabular-nums;
   }
 
   .hero.finalized {
