@@ -135,7 +135,101 @@ votes                               -- one row per (round, user)
 - `POST /api/rooms/:id/ws-ticket` — mints the short-lived room token described in §3
 - `GET  /api/rooms/:id/ws` — upgrades to WebSocket; forwards to DO
 
-## 6. Room view UI
+## 6. Design system
+
+The visual direction is a **"Modern TUI"**: terminal-app DNA (JetBrains Mono for data, dashed dividers, keyboard hints, status bar) with SaaS-grade polish (gradient surfaces, hairline highlights, refined motion). Black/dark-grey base, semantic accent colors. Selection signaled by size, not color (Mac-Dock-style card enlargement).
+
+Reference mockups live in `.superpowers/brainstorm/` (untracked); the canonical room view is `visual-direction-merged-v11.html`, plus revealed/landing/history/settings screens.
+
+### 6.1 Central token store
+
+**All theme values live in one place** (`src/lib/theme/tokens.css`) as CSS custom properties, applied at the root via a `[data-theme]` attribute on `<html>`. Components consume tokens (`var(--surface-panel)`, `--accent-go`); **no component hardcodes a color, radius, shadow, or spacing value**. Swapping the theme is a single-file change. A future light mode is added by defining a second `[data-theme="light"]` block in the same file — no component changes required.
+
+For Tailwind users (likely Tailwind v4 in this project), the token file doubles as the `@theme` source so Tailwind utilities resolve to the same vars (`bg-panel`, `text-accent-go`, etc.). Either system stays single-source.
+
+### 6.2 Color tokens
+
+Tokyo Night-derived dark palette over a true black canvas. Each token has a semantic role; never reference a color by hue.
+
+| Token | Hex | Role |
+|---|---|---|
+| `--bg` | `#0a0a0b` | Canvas |
+| `--bg-2` | `#0f0f11` | Recessed surface (hero pane, inset wells) |
+| `--panel` | `#141416` | Elevated panel (sidebars, cards) |
+| `--panel-2` | `#1c1c1f` | Hover/active surface |
+| `--panel-3` | `#26262a` | Highest elevation (avatars, card faces) |
+| `--hairline` | `rgba(255,255,255,0.06)` | Default divider |
+| `--hairline-strong` | `rgba(255,255,255,0.10)` | Emphasis divider, top-edge highlight |
+| `--text` | `#d4d6dd` | Body |
+| `--bright` | `#ffffff` | Headlines, host/you names |
+| `--mid` | `#9ea0aa` | Secondary text |
+| `--dim` | `#6e6e76` | Tertiary text, disabled |
+| `--ink` | `#0a0a0b` | Text on saturated bg (deprecated for verdict pills) |
+| `--accent-go` | `#2dd35f` | Primary action, consensus, voted, live |
+| `--accent-go-bright` | `#46e57a` | `--accent-go` hover |
+| `--accent-stop` | `#ef4444` | Destructive, no-consensus, errors |
+| `--accent-amber` | `#e9b86b` | In-progress, voting, keycaps, round number |
+| `--accent-cyan` | `#82d7ff` | Info, room slug, deck name, count chips |
+| `--accent-mauve` | `#c4a7fa` | Host identity |
+| `--accent-pink` | `#f57d96` | "You" identity |
+
+**Verdict pills** use saturated background + white text (`--bright`), with a gradient (e.g. `linear-gradient(180deg, var(--accent-go-bright), var(--accent-go))`), inset top highlight, and color-tinted drop shadow. Same shape for `--accent-stop` (no-consensus) and `--accent-go` (consensus).
+
+### 6.3 Typography tokens
+
+| Token | Value | Role |
+|---|---|---|
+| `--font-sans` | `Inter, system-ui, sans-serif` | Body, headlines, prose |
+| `--font-mono` | `JetBrains Mono, SF Mono, ui-monospace, monospace` | Data, numbers, key hints, slugs, mono labels |
+| `--fs-display` | `30px` | Story title in hero |
+| `--fs-h1` | `28-32px` | Page headers |
+| `--fs-body` | `12.5px` | Default body |
+| `--fs-small` | `11px` | Mono labels, status bar |
+| `--fs-micro` | `10px` | Pane heads, all-caps tags |
+
+**Numerics:** every number uses `font-variant-numeric: tabular-nums`. Inter is configured with feature settings `'ss01', 'cv11', 'tnum'`. Card face values are mono with `tnum`.
+
+**Weights:** 500 baseline (Inter), 600 emphasis, 700-800 for headlines and labels. Bolder than typical SaaS.
+
+### 6.4 Surface tokens
+
+| Token | Value | Role |
+|---|---|---|
+| `--radius-sm` | `3.5px` | Keycaps, mini chips |
+| `--radius-md` | `5-6px` | Buttons, cards in the deck, avatars |
+| `--radius-lg` | `8-10px` | Panels, history strip, room cards |
+| `--shadow-card` | `inset 0 1px 0 rgba(255,255,255,0.04), 0 1px 2px rgba(0,0,0,0.4)` | Resting card |
+| `--shadow-lift` | `inset 0 1px 0 rgba(255,255,255,0.12), 0 24px 50px -8px rgba(0,0,0,0.85), 0 12px 22px rgba(0,0,0,0.5)` | Selected card |
+| `--shadow-go` | `0 1px 0 inset rgba(255,255,255,0.2), 0 8px 18px -6px rgba(45,211,95,0.6), 0 2px 6px rgba(45,211,95,0.25)` | Primary button |
+
+**Top-edge highlight pattern:** every elevated surface gets a `::before` pseudo-element with `linear-gradient(90deg, transparent, var(--hairline-strong), transparent)` at the top edge. Subtle but signals "this is a real surface".
+
+### 6.5 Components
+
+Components are Svelte 5 single-file components in `src/lib/components/`. Each consumes tokens; none hardcodes a color or radius. Minimum component set for v1:
+
+- `Topbar` — wordmark + breadcrumb + nav + user pill
+- `Statusbar` — keyboard affordance row
+- `PaneHead` — `"── label ── [key]"` divider
+- `Card` (story card / room card / settings card with optional `danger` variant)
+- `Pcard` — playing card; props: `value`, `selected`, `revealed`, `consensus`
+- `Chip` — vote chip; props: `voter`, `value`, `role`, `consensus`
+- `Verdict` — pill; props: `kind: 'consensus' | 'no-consensus' | 'skipped' | 'pending'`
+- `Avatar` — square; props: `initial`, `role: 'default' | 'host' | 'you'`
+- `Button` — variants: `primary` (go-green gradient), `ghost`, `danger`, `danger-solid`
+- `Keycap` — `[R]` keyboard hint
+- `HistoryStrip` — round row with chips + summary
+
+### 6.6 State-based mood
+
+Visual mood shifts with room state, **using the same tokens**:
+
+- **Voting** — amber-tinted glow at the top of the hero pane, amber accents on round tag and active story rail. Tighter, focused feel.
+- **Revealed** — green-tinted glow, green accents on round tag and active story, green-tinted card shadows on consensus / pink-tinted on divergent. Softer, atmospheric feel.
+
+This is achieved purely by switching the `--accent-current` token in the room layout based on round state, never by component-level overrides.
+
+## 7. Room view UI
 
 Three panes:
 
@@ -160,7 +254,7 @@ Three panes:
 - **On disconnect:** participant fades to "away" but their slot stays. Reconnect within ~5 min resumes seamlessly. Host disconnect does not pause the room; after >10 min of host absence the UI surfaces a "Claim host" button to the longest-connected member, which sends a `claim_host` message the DO accepts only while the absence threshold still holds.
 - **Kick:** removes from current session only. The user can rejoin (their `room_members` row is preserved). Effectively a "boot from socket" action.
 
-## 7. WebSocket protocol
+## 8. WebSocket protocol
 
 JSON messages over a single WebSocket per client. The DO multiplexes by room.
 
@@ -201,7 +295,7 @@ JSON messages over a single WebSocket per client. The DO multiplexes by room.
 
 All host-restricted message types are re-validated by the DO against the verified `role` in the room token. Clients never assert their own role.
 
-## 8. Error handling
+## 9. Error handling
 
 - **Unauthorized WS connection** (bad/expired token, non-member): server closes with code 4401.
 - **Stale state** (client sends `vote` for a story that is no longer the current round): server replies `error { code: "stale" }` and pushes a fresh `state`.
@@ -209,21 +303,21 @@ All host-restricted message types are re-validated by the DO against the verifie
 - **D1 write failure on reveal:** the DO retries with exponential backoff up to 3 times, then surfaces `error { code: "persist_failed" }` to the host and keeps the round open in memory.
 - **Concurrent host actions** (two hosts after a transfer race): DO serializes all writes; whichever message arrives first wins, the loser receives `error { code: "not_host" }`.
 
-## 9. Testing approach
+## 10. Testing approach
 
 - **D1 layer:** unit tests against `better-sqlite3` with the production schema, covering round transitions and the accept/revote/skip lifecycle.
 - **DO layer:** Cloudflare's `unstable_dev` / Miniflare for integration tests that open WebSockets and drive a full estimation round (join, vote, reveal, accept, re-vote, history).
 - **SvelteKit routes:** standard Vitest component + server tests; auth gating tested with mocked Clerk session.
 - **End-to-end:** Playwright over the deployed preview environment with two browser contexts simulating two team members.
 
-## 10. Deployment
+## 11. Deployment
 
 - Single `wrangler.toml` with bindings: D1 (`DB`), Durable Object namespace (`ROOM`).
 - `wrangler d1 migrations` for schema management; migrations live in `migrations/`.
 - Secrets via `wrangler secret put`: `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, `ROOM_TOKEN_SECRET`.
 - CI: GitHub Actions runs typecheck + tests + `wrangler deploy --dry-run` on PR; deploys on merge to `main`.
 
-## 11. Open questions
+## 12. Open questions
 
 None blocking. Items deferred to post-v1:
 

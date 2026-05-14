@@ -8,6 +8,7 @@ dist/
 coverage/
 .cache/
 
+.superpowers/
 # Local environment and secrets
 .env
 .env.*
