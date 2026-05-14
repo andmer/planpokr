@@ -10,7 +10,7 @@ binding = "ASSETS"
 [[d1_databases]]
 binding = "DB"
 database_name = "planpokr"
-database_id = "REPLACE_AFTER_CREATE"
+database_id = "7ebb6512-f64d-4d3b-a909-0020838c36b9"
 migrations_dir = "migrations"
 
 [[durable_objects.bindings]]
