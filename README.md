@@ -27,6 +27,19 @@ pnpm dev
 
 Open <http://localhost:5173>. Sign in via Clerk, create a room, share the room URL with a teammate (or open a second browser tab as a different Clerk user).
 
+### `vite dev` vs `wrangler dev`
+
+`pnpm dev` runs Vite, which is fast but **does not run the `RoomDO` Durable Object**. Auth, the home/about/sign-in pages, and D1-backed REST endpoints all work, but inside a room the WebSocket connection will fail and the footer will stay on `connecting…` forever (the `RoomDO` binding warns at startup that it isn't available locally).
+
+To exercise the live room features (voting, reveal, accept, presence) locally, build first and use Wrangler's dev server, which runs the real Worker + DO via `workerd`:
+
+```bash
+pnpm build
+pnpm dlx wrangler dev
+```
+
+Iteration is slower (rebuild after each change) but everything works. Alternatively, just test room features against the deployed `planpokr.com`.
+
 ### Environment files
 
 Two env files are needed for local dev — both are gitignored.
