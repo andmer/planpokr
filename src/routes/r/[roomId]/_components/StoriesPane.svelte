@@ -10,9 +10,11 @@
     stories: Story[];
     current: LiveCurrent | null;
     isHost: boolean;
+    viewingStoryId: string | null;
+    onView: (storyId: string | null) => void;
     send: (m: ClientMsg) => void;
   }
-  let { roomId, stories, current, isHost, send }: Props = $props();
+  let { roomId, stories, current, isHost, viewingStoryId, onView, send }: Props = $props();
 
   let adding = $state(false);
   let newTitle = $state('');
@@ -82,9 +84,22 @@
     }
   }
 
-  function startRound(storyId: string) {
+  // Click intents:
+  // - Currently-active round's story → drop the viewing pointer ("back to live").
+  // - Estimated / skipped story → set viewing pointer; HeroPane shows result.
+  // - Pending / voting story → start a fresh round, clear viewing pointer.
+  function selectStory(storyId: string) {
     if (!isHost) return;
-    if (current?.storyId === storyId) return;
+    const story = stories.find((s) => s.id === storyId);
+    if (current?.storyId === storyId) {
+      onView(null);
+      return;
+    }
+    if (story?.status === 'estimated' || story?.status === 'skipped') {
+      onView(storyId);
+      return;
+    }
+    onView(null);
     send({ type: 'start_round', storyId });
   }
 </script>
@@ -114,7 +129,7 @@
       } else if (e.key === 'Enter') {
         if (highlightIndex < 0 || !filteredStories[highlightIndex]) return;
         e.preventDefault();
-        startRound(filteredStories[highlightIndex].id);
+        selectStory(filteredStories[highlightIndex].id);
       }
     }}
   />
@@ -130,6 +145,7 @@
       type="button"
       class="story"
       class:active={current?.storyId === story.id}
+      class:viewing={viewingStoryId === story.id && current?.storyId !== story.id}
       class:highlighted={i === highlightIndex}
       class:pending={story.status === 'pending'}
       class:voting={story.status === 'voting'}
@@ -137,7 +153,7 @@
       class:skipped={story.status === 'skipped'}
       class:host-clickable={isHost}
       disabled={!isHost}
-      onclick={() => startRound(story.id)}
+      onclick={() => selectStory(story.id)}
       onmouseenter={() => (highlightIndex = i)}
     >
       <span class="prefix">{current?.storyId === story.id ? '▸' : '·'}</span>
@@ -258,6 +274,11 @@
     color: var(--color-bright);
     box-shadow: inset 2px 0 0 var(--color-amber);
     font-weight: 700;
+  }
+  .story.viewing {
+    background: linear-gradient(90deg, rgb(168 220 255 / 0.08), rgb(168 220 255 / 0.02));
+    color: var(--color-bright);
+    box-shadow: inset 2px 0 0 var(--color-mid);
   }
   .story.highlighted {
     background: var(--color-panel-2);

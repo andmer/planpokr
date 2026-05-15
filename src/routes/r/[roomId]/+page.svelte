@@ -29,6 +29,15 @@
 
   onDestroy(close);
 
+  // Client-only "I'm looking at this finalized story" pointer. Set when the
+  // host clicks an estimated/skipped story in the sidebar — so we can show
+  // its result without firing `start_round`, which would wipe the estimate.
+  // Cleared only by explicit user gestures: clicking the live round's story
+  // = "go back to live", clicking a pending story = "start round here".
+  // Letting the host inspect history while a round is active is the whole
+  // point, so we deliberately don't auto-clear when live.current changes.
+  let viewingStoryId = $state<string | null>(null);
+
   // Task 34 — global keyboard shortcuts for host actions.
   onMount(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -80,9 +89,11 @@
     stories={$live.stories}
     current={$live.current}
     isHost={$live.you?.isHost ?? false}
+    {viewingStoryId}
+    onView={(id) => (viewingStoryId = id)}
     {send}
   />
-  <HeroPane live={$live} {send} {setMyVote} />
+  <HeroPane live={$live} {viewingStoryId} {send} {setMyVote} />
   <ParticipantsPane
     presence={$live.presence}
     current={$live.current}

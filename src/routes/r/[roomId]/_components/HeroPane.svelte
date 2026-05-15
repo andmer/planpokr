@@ -12,10 +12,11 @@
 
   interface Props {
     live: LiveState;
+    viewingStoryId: string | null;
     send: (m: ClientMsg) => void;
     setMyVote: (v: string | null) => void;
   }
-  let { live, send, setMyVote }: Props = $props();
+  let { live, viewingStoryId, send, setMyVote }: Props = $props();
 
   const currentStory = $derived(live.stories.find((s) => s.id === live.current?.storyId));
   const cards = $derived<string[]>(live.room ? DECKS[live.room.deck as Deck] : []);
@@ -67,14 +68,39 @@
   // After Accept / Skip, `live.current` clears but `lastFinalized` carries
   // the just-locked-in result so we can show it in the middle until the
   // host moves on to another story.
-  const finalized = $derived(
-    !live.current && live.lastFinalized
-      ? {
-          ...live.lastFinalized,
-          story: live.stories.find((st) => st.id === live.lastFinalized!.storyId)
-        }
-      : null
-  );
+  //
+  // `viewingStoryId` (parent-owned, client-only) lets the host click any
+  // previously-finalized story in the sidebar to review it. We synthesize a
+  // matching shape so the same finalized pane below renders both cases.
+  // The viewing pointer wins when set: if the host clicked a different
+  // finalized story than the most-recent one, show *that* one.
+  // Priority: viewingStoryId (host explicitly chose to review) > live.current
+  // (active round) > lastFinalized (just-locked-in result). The viewing
+  // pointer needs to win over live.current so the host can inspect a
+  // previously-finalized story without disrupting an ongoing round.
+  const finalized = $derived.by(() => {
+    if (viewingStoryId) {
+      const story = live.stories.find((st) => st.id === viewingStoryId);
+      if (story?.status === 'estimated' || story?.status === 'skipped') {
+        return {
+          storyId: story.id,
+          estimate: story.final_estimate ?? '—',
+          kind: (story.status === 'estimated' ? 'accepted' : 'skipped') as
+            | 'accepted'
+            | 'skipped',
+          story
+        };
+      }
+    }
+    if (live.current) return null;
+    if (live.lastFinalized) {
+      return {
+        ...live.lastFinalized,
+        story: live.stories.find((st) => st.id === live.lastFinalized!.storyId)
+      };
+    }
+    return null;
+  });
 
   // Map server-sent priorRounds onto the shape HistoryStrip expects.
   // `role` colours the chip per voter (you/host/default); `state` ties the
@@ -120,7 +146,7 @@
   class:revealed={inReveal}
   class:finalized={!!finalized}
 >
-  {#if !live.current && finalized}
+  {#if finalized}
     <!-- Show the just-locked-in story as the primary content of the hero
          pane. Cleared on the next round_started, so picking another story
          in the sidebar transitions naturally back into voting. -->
