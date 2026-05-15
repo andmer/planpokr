@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import PaneHead from '$lib/components/PaneHead.svelte';
   import type { Story } from '$lib/types';
   import type { ClientMsg } from '$lib/do/messages';
@@ -18,6 +19,44 @@
   let newDesc = $state('');
   let saving = $state(false);
   let saveError = $state<string | null>(null);
+
+  let query = $state('');
+  let searchEl = $state<HTMLInputElement | null>(null);
+  let highlightIndex = $state(-1);
+  const filteredStories = $derived(
+    query.trim()
+      ? stories.filter((s) => s.title.toLowerCase().includes(query.trim().toLowerCase()))
+      : stories
+  );
+
+  // Reset highlight whenever the filtered list changes (new query, story added,
+  // story removed) so we never point past the end of the array.
+  $effect(() => {
+    if (highlightIndex >= filteredStories.length) {
+      highlightIndex = filteredStories.length === 0 ? -1 : filteredStories.length - 1;
+    }
+  });
+
+  // `/` focuses the search input from anywhere in the room, matching the
+  // Statusbar hint. Ignored when the user is already typing in a field.
+  onMount(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== '/') return;
+      const t = e.target as HTMLElement | null;
+      if (
+        t instanceof HTMLInputElement ||
+        t instanceof HTMLTextAreaElement ||
+        t?.isContentEditable
+      ) {
+        return;
+      }
+      e.preventDefault();
+      searchEl?.focus();
+      searchEl?.select();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
 
   async function addStory() {
     if (!newTitle.trim() || saving) return;
@@ -53,15 +92,45 @@
 <aside class="pane">
   <PaneHead hint="host">Stories</PaneHead>
 
+  <input
+    bind:this={searchEl}
+    bind:value={query}
+    type="search"
+    class="search"
+    placeholder="/ search stories"
+    onkeydown={(e) => {
+      if (e.key === 'Escape') {
+        query = '';
+        highlightIndex = -1;
+        searchEl?.blur();
+      } else if (e.key === 'ArrowDown') {
+        if (filteredStories.length === 0) return;
+        e.preventDefault();
+        highlightIndex = Math.min(highlightIndex + 1, filteredStories.length - 1);
+      } else if (e.key === 'ArrowUp') {
+        if (filteredStories.length === 0) return;
+        e.preventDefault();
+        highlightIndex = Math.max(highlightIndex - 1, 0);
+      } else if (e.key === 'Enter') {
+        if (highlightIndex < 0 || !filteredStories[highlightIndex]) return;
+        e.preventDefault();
+        startRound(filteredStories[highlightIndex].id);
+      }
+    }}
+  />
+
   {#if stories.length === 0}
     <p class="empty">No stories yet.</p>
+  {:else if filteredStories.length === 0}
+    <p class="empty">No stories match "{query}".</p>
   {/if}
 
-  {#each stories as story (story.id)}
+  {#each filteredStories as story, i (story.id)}
     <button
       type="button"
       class="story"
       class:active={current?.storyId === story.id}
+      class:highlighted={i === highlightIndex}
       class:pending={story.status === 'pending'}
       class:voting={story.status === 'voting'}
       class:estimated={story.status === 'estimated'}
@@ -69,6 +138,7 @@
       class:host-clickable={isHost}
       disabled={!isHost}
       onclick={() => startRound(story.id)}
+      onmouseenter={() => (highlightIndex = i)}
     >
       <span class="prefix">{current?.storyId === story.id ? '▸' : '·'}</span>
       <span class="name">{story.title}</span>
@@ -143,6 +213,24 @@
     font-size: 11px;
     margin: 4px 0 12px;
   }
+  .search {
+    margin: 4px 0 12px;
+    background: var(--color-bg-2);
+    border: 1px solid var(--color-hairline);
+    color: var(--color-bright);
+    padding: 6px 10px;
+    border-radius: var(--radius-md);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    width: 100%;
+  }
+  .search::placeholder {
+    color: var(--color-dim);
+  }
+  .search:focus {
+    outline: none;
+    border-color: var(--color-amber);
+  }
   .story {
     display: flex;
     align-items: center;
@@ -170,6 +258,11 @@
     color: var(--color-bright);
     box-shadow: inset 2px 0 0 var(--color-amber);
     font-weight: 700;
+  }
+  .story.highlighted {
+    background: var(--color-panel-2);
+    color: var(--color-bright);
+    box-shadow: inset 2px 0 0 var(--color-go);
   }
   .prefix {
     color: var(--color-dim);
