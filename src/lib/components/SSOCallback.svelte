@@ -8,6 +8,9 @@
 </script>
 
 <AuthenticateWithRedirectCallback
+  signInUrl="/sign-in"
+  signUpUrl="/sign-up"
+  continueSignUpUrl="/sign-up"
   signInForceRedirectUrl="/"
   signUpForceRedirectUrl="/"
   signInFallbackRedirectUrl="/"
