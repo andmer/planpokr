@@ -42,10 +42,9 @@
         signUpFallbackRedirectUrl: '/'
       });
 
-      // Clerk's handleRedirectCallback navigates the page on success, but the
-      // session may not be reflected on `clerk.session` synchronously. Poll a
-      // few times before declaring failure so a slow propagation doesn't
-      // trigger the error fallback (which previously destroyed real sessions).
+      // handleRedirectCallback navigates on success, but `clerk.session`
+      // may not be reflected synchronously. Poll a few times before falling
+      // through to recovery / error display.
       for (let i = 0; i < 10; i++) {
         if (clerk.session) {
           status = 'Sign-in complete — redirecting…';
@@ -62,6 +61,65 @@
       dbg.signUpStatus = clerk.client?.signUp?.status ?? null;
       dbg.signUpMissing = clerk.client?.signUp?.missingFields ?? null;
       dbg.signUpUnverified = clerk.client?.signUp?.unverifiedFields ?? null;
+
+      // Clerk's sign-in flow can't auto-create users from a new OAuth identity
+      // ("External Account was not found"), and the sign-up flow can't be used
+      // when the email already belongs to a user (Clerk reports it as a
+      // missing_requirements with email_address listed). Transfer the in-flight
+      // OAuth attempt in whichever direction is needed so the user lands in a
+      // session regardless of which button they clicked.
+
+      const signInNeedsTransfer = clerk.client?.signIn?.firstFactorVerification?.status === 'transferable'
+        || clerk.client?.signIn?.firstFactorVerification?.error?.code === 'external_account_not_found'
+        || clerk.client?.signIn?.status === 'needs_identifier';
+
+      if (signInNeedsTransfer && clerk.client?.signUp) {
+        status = 'New account — finishing sign-up…';
+        try {
+          await clerk.client.signUp.create({ transfer: true });
+          for (let i = 0; i < 10; i++) {
+            if (clerk.session) {
+              window.location.assign('/');
+              return;
+            }
+            await new Promise((r) => setTimeout(r, 200));
+          }
+          dbg.transferSignUpStatus = clerk.client?.signUp?.status ?? null;
+          dbg.transferSignUpMissing = clerk.client?.signUp?.missingFields ?? null;
+        } catch (te: any) {
+          dbg.transferToSignUpError = { name: te?.name, code: te?.code, errors: te?.errors, msg: te?.message };
+        }
+      }
+
+      // Reverse: signUp got an existing-user collision (sign-up flow with an
+      // already-registered Google identity). Clerk surfaces this as a missing
+      // email_address in signUp.missingFields rather than a clear error.
+      const signUpNeedsTransfer = clerk.client?.signUp?.status === 'missing_requirements'
+        && Array.isArray(clerk.client?.signUp?.missingFields)
+        && clerk.client.signUp.missingFields.includes('email_address')
+        && !clerk.session;
+
+      if (signUpNeedsTransfer) {
+        // signIn.create({ transfer: true }) doesn't reliably pick up the OAuth
+        // identity off the signUp resource in this Clerk JS version, so just
+        // restart the OAuth flow as a sign-in. The Google session is still
+        // fresh in the browser, so the user won't see any prompts — Google
+        // returns immediately and Clerk's sign-in flow recognizes the existing
+        // external account.
+        status = 'Existing account — signing you in…';
+        try {
+          await clerk.client.signIn.authenticateWithRedirect({
+            strategy: 'oauth_google',
+            redirectUrl: window.location.origin + '/sign-in/sso-callback',
+            redirectUrlComplete: '/'
+          });
+          // The above triggers a full-page redirect; control won't return here
+          // on success. If we somehow continue, fall through to error display.
+          return;
+        } catch (te: any) {
+          dbg.signInRetryError = { name: te?.name, code: te?.code, errors: te?.errors, msg: te?.message };
+        }
+      }
 
       status = 'Handshake finished without a session.';
       error =
