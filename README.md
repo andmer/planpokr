@@ -1,5 +1,10 @@
 # planpokr
 
+[![CI](https://github.com/andmer/planpokr/actions/workflows/ci.yml/badge.svg)](https://github.com/andmer/planpokr/actions/workflows/ci.yml)
+[![SvelteKit](https://img.shields.io/badge/SvelteKit-FF3E00?logo=svelte&logoColor=white)](https://kit.svelte.dev)
+[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=white)](https://workers.cloudflare.com)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+
 Team planning-poker webapp. Deployed at [planpokr.com](https://planpokr.com).
 
 ## Stack
