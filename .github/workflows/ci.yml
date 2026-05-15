@@ -27,6 +27,12 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # `pnpm build` produces .svelte-kit/cloudflare/_worker.js, which
+      # src/worker.ts imports. Without it, svelte-check fails to resolve the
+      # module on a fresh checkout. Building first also validates that the
+      # production bundle compiles.
+      - run: pnpm build
+
       - run: pnpm check
 
       - run: pnpm test
